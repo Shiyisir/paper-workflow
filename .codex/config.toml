@@ -1,0 +1,7 @@
+sandbox_mode = "workspace-write"
+[mcp_servers.chrome-devtools]
+args = [
+    "-y",
+    "chrome-devtools-mcp@latest",
+]
+command = "npx"

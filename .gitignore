@@ -1,0 +1,24 @@
+# 生成输出
+outputs/
+*.docx
+*.pdf
+!templates/docx/*.docx
+
+# 生成图片（保留源文件 .svg/.py）
+figures/*.png
+tables/*.png
+
+# Python
+__pycache__/
+*.pyc
+
+# OS
+Thumbs.db
+.DS_Store
+
+# 分析临时输出
+analysis/figures/
+analysis/tables/
+
+# 运行时状态
+.paper-workflow/
