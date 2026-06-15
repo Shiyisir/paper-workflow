@@ -1,0 +1,3 @@
+[tool.pytest.ini_options]
+testpaths = [".claude/skills/paper-workflow/tests"]
+pythonpath = [".claude/skills/paper-workflow/scripts"]
