@@ -1,24 +1,16 @@
-# 生成输出
+# 论文项目运行时产物
+.paper-workflow/
 outputs/
-*.docx
-*.pdf
-!templates/docx/*.docx
+!outputs/.gitkeep
 
-# 生成图片（保留源文件 .svg/.py）
-figures/*.png
-tables/*.png
+# 外部技能资源（通过符号链接引入，非本仓库内容）
+.agents/skills/nature-figure/assets/
 
-# Python
+# Python 缓存
 __pycache__/
 *.pyc
+.pytest_cache/
 
 # OS
 Thumbs.db
 .DS_Store
-
-# 分析临时输出
-analysis/figures/
-analysis/tables/
-
-# 运行时状态
-.paper-workflow/
