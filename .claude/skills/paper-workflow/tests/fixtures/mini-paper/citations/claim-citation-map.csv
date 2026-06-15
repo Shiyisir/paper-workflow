@@ -1,0 +1,4 @@
+claim_id,section,claim,supporting_refs,supporting_citekeys,strength,verified,notes
+C001,introduction,石漠化是喀斯特地区最严重的生态环境问题,wang2024RockyDesertification,wang2024RockyDesertification,strong,yes,
+C002,introduction,地下水资源与石漠化密切相关,li2022KarstWater,li2022KarstWater,medium,yes,
+C003,results,深度学习模型在喀斯特分类中准确率达到92%,zhang2023DeepLearningKarst,zhang2023DeepLearningKarst,strong,yes,

@@ -1,0 +1,4 @@
+ref_id,citekey,topic,region,data_source,method,key_finding,limitation,usable_sections,page_ref,notes
+,wang2024RockyDesertification,rocky_desertification_impacts,karst_southwest_china,satellite+field_survey,spatial_analysis,ESV reduced by 23%,single time point no trend,introduction;results,p.3-5,Core reference
+,zhang2023DeepLearningKarst,karst_classification,global_karst,satellite_imagery,deep_learning,CNN achieves 92% accuracy,limited ground truth,introduction;methods,p.2-4,Method reference
+,li2022KarstWater,groundwater_ecology,karst_aquifers,hydrogeological_data,statistical_modeling,groundwater drives ecosystem patterns,seasonal variability,introduction;discussion,p.6-8,Supporting reference
