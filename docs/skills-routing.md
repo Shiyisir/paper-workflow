@@ -4,39 +4,41 @@
 
 ## 总原则
 
-- 用户需求明确时，直接执行
+- `/paper-workflow ...` 命令 → paper-workflow 编排器（项目模式）
+- 自然语言 → 叶子 skill 直接响应（单次任务模式）
 - 用户需求模糊时，先判断阶段，再建议技能
 - 知网相关操作前，先检查 Chrome 是否可达
 - 英文主题优先国际文献；中文主题分情况判断来源
+
+## 编排路由（paper-workflow）
+
+| 命令 | 功能 |
+|------|------|
+| `/paper-workflow init` | 初始化论文项目 |
+| `/paper-workflow status` | 查看阶段进度 |
+| `/paper-workflow resume` | 从断点恢复 |
+| `/paper-workflow run <stage>` | 推进阶段 |
+| `/paper-workflow qa` | 运行质量核验 |
+| `/paper-workflow render <profile>` | 输出终稿 |
 
 ## 通用路由
 
 | 用户请求 | 优先技能 | 说明 |
 |---|---|---|
-| 搜英文/国际论文 | 
-ature-academic-search | PubMed/CrossRef/arXiv |
-| 搜中文论文 | /cnki-search 或 cnki-researcher | 需要 Chrome |
-| 查期刊级别/核心/影响因子 | /cnki-journal-index | |
-| 下载论文 PDF/CAJ | /cnki-download | 需要知网登录 |
-| 导出到 Zotero | /cnki-export zotero | |
-| 读论文/翻译/做阅读笔记 | 
-ature-reader | |
-| 起草论文章节 | 
-ature-writing | |
-| 润色学术英语 | 
-ature-polishing | |
-| 为段落补引文 | 
-ature-citation | |
-| 做论文图表 | 
-ature-figure | 先确认 Python/R |
-| 写 Data Availability | 
-ature-data | |
-| 回复审稿意见 | 
-ature-response | |
-| 论文转 PPT | 
-ature-paper2ppt | |
-| 不确定该用什么 | 
-ature-paper 入口 | 自动阶段判断 |
+| 搜英文/国际论文 | nature-academic-search | PubMed/CrossRef/arXiv |
+| 搜中文论文 | cnki-search 或 cnki-researcher | 需要 Chrome |
+| 查期刊级别/核心/影响因子 | cnki-journal-index | |
+| 下载论文 PDF/CAJ | cnki-download | 需要知网登录 |
+| 导出到 Zotero | cnki-export zotero | |
+| 读论文/翻译/做阅读笔记 | nature-reader | |
+| 起草论文章节 | nature-writing | |
+| 润色学术英语 | nature-polishing | |
+| 为段落补引文 | nature-citation | |
+| 做论文图表 | nature-figure | 先确认 Python/R |
+| 写 Data Availability | nature-data | |
+| 回复审稿意见 | nature-response | |
+| 论文转 PPT | nature-paper2ppt | |
+| 不确定该用什么 | nature-paper 入口 | 自动阶段判断 |
 
 ## 检索源判断
 

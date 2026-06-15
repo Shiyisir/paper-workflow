@@ -1,72 +1,45 @@
 ﻿# 工作流总览
 
-本文档描述论文项目从开始到结束的主流程。
+本文档描述论文项目的完整生命周期。
 
-## 六阶段模型
+## 两种工作模式
 
-1. 文献调研
-2. 撰写初稿
-3. 制作图表
-4. 润色与数据
-5. 投稿回复
-6. 汇报展示
+| 模式 | 入口 | 适用场景 |
+|------|------|----------|
+| 编排模式 | `/paper-workflow init|run|qa|render` | 完整论文项目，按 17 阶段推进 |
+| 单次任务 | 自然语言（如"搜知网储能论文"） | 单次操作，叶子 skill 直接响应 |
+
+## 17 阶段模型（paper-workflow）
+
+```
+requirements → material_prep → literature_search → literature_dedup
+  → deep_reading → evidence_matrix → research_design → data_analysis
+  → charts_and_tables → outline → writing → citation_verification
+  → polishing → formatting → originality_check → quality_qa → revision
+```
+
+完整说明见 `.claude/skills/paper-workflow/references/lifecycle.md`。
+
+## 六阶段简版（单次任务模式）
+
+适合不使用编排器的快速任务：
+
+1. 文献调研 → nature-academic-search / cnki-search
+2. 撰写初稿 → nature-writing
+3. 制作图表 → nature-figure
+4. 润色与数据 → nature-polishing / nature-data
+5. 投稿回复 → nature-response
+6. 汇报展示 → nature-paper2ppt
 
 ## 使用原则
 
-- 先确认当前活跃论文
-- 先读论文 CONTEXT.md
-- 再根据阶段选择技能
-- 每次优先推进一个阶段，避免同时做太多事
-
-## 典型流程
-
-### 阶段 1：文献调研
-先确定：
-- 英文主题还是中文主题
-- 国际文献为主还是中国知网为主
-- 是否需要对比中外文献
-
-### 阶段 2：撰写初稿
-适合处理：
-- 摘要
-- 引言
-- 结果
-- 讨论
-- 方法
-
-### 阶段 3：制作图表
-先确认：
-- 使用 Python 还是 R
-- 输出格式要求
-- 是否需要 Nature 风格
-
-### 阶段 4：润色与数据
-适合处理：
-- 学术英语润色
-- 数据可用性声明
-- 数据管理说明
-
-### 阶段 5：投稿回复
-适合处理：
-- 审稿意见分类
-- 逐条回复
-- 回复信整理
-
-### 阶段 6：汇报展示
-适合处理：
-- 论文转组会 PPT
-- 结果提炼
-- 图表重排
-
-## 状态更新规则
-
-每完成一个重要步骤后，应更新对应论文 CONTEXT.md：
-- 当前阶段
-- 已完成产物
-- 下一步计划
+- 先确认当前活跃论文（CONTEXT.md）
+- 编排模式：用 `/paper-workflow` 命令管理
+- 单次任务：直接描述需求，叶子 skill 自动响应
+- paper-workflow 不会自动触发（`disable-model-invocation: true`）
 
 ## 常见误区
 
 - 不要一次启动全部阶段
-- 不要跳过论文 CONTEXT.md 直接开工
+- 编排模式不要跳过 evidence_matrix 直接写作
 - 不要把详细技能说明塞进根 README.md

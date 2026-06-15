@@ -2,6 +2,23 @@
 
 本文档记录项目运行所需的前提条件。
 
+## 0. paper-workflow 编排器（核心）
+
+```bash
+# Python 依赖
+pip install -r .claude/skills/paper-workflow/requirements.txt
+
+# 环境探测
+python .claude/skills/paper-workflow/scripts/check_env.py
+```
+
+| 组件 | 最低版本 | 必需 |
+|------|:---:|:--:|
+| Python | ≥3.10 | ● |
+| Pandoc | ≥3.0 | ● |
+| LaTeX (xelatex) | — | ○ 未安装时只生成 .tex |
+| SVG 转换 (cairosvg/rsvg) | — | ○ 未安装时 warning 跳过 |
+
 ## 1. Chrome 远程调试（知网相关技能必需）
 
 使用 CNKI 技能前，需要 Chrome 可被自动化工具访问。

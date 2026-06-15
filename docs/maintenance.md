@@ -65,10 +65,9 @@
 - 同时维护多个重复规则文件
 - 让根 CONTEXT.md 承担教程功能
 
-## 本次归档处理
+## 当前结构说明
 
-- `.claude/` 已不再作为新的权威运行目录
-- 历史内容已复制到 `.archive/.claude-archive-2026-05-27/`
-- `.claude/README.md` 已标注为归档说明
-- 当前运行时 skills 以 `.agents/skills/` 为准
-- 当前 agent 配置以 `.codex/agents/` 为准
+- paper-workflow 编排器：`.claude/skills/paper-workflow/`（v0.1.0-mvp）
+- 叶子 skill 符号链接：`.agents/skills/` → `~/.aweskill/skills/`
+- MCP 配置（Chrome DevTools）：`.claude/settings.json` 和 `.codex/config.toml`
+- Codex agent 配置：`.codex/agents/`

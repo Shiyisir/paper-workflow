@@ -15,6 +15,12 @@
 
 当前正在推进的论文：[无]
 
+## paper-workflow 编排器
+
+`paper-workflow` v0.1.0-mvp 已交付，位于 `.claude/skills/paper-workflow/`。
+通过 `/paper-workflow init|status|resume|run|qa|render` 命令管理论文项目。
+单次任务（搜文献、润色等）仍由叶子 skill 直接响应，不走 paper-workflow。
+
 ## 工作空间全局设置
 
 - 文献来源偏好：国际文献（PubMed/CrossRef/arXiv）+ 中国知网（CNKI）
