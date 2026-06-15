@@ -145,7 +145,7 @@ def postprocess(
     warnings: list[str] = []
     errors: list[str] = []
 
-    # Check if processing is needed
+    # Check if processing is needed (compare against input hash)
     if not should_postprocess(input_path, profile, sidecar_path):
         return {
             "processed": False, "skipped": True,
@@ -184,9 +184,9 @@ def postprocess(
     output_path.parent.mkdir(parents=True, exist_ok=True)
     doc.save(str(output_path))
 
-    # Write sidecar
+    # Write sidecar (store input hash so re-processing can be detected)
     sidecar_data = {
-        "docx_hash": file_hash(output_path),
+        "docx_hash": file_hash(input_path),
         "profile_hash": profile_hash(profile),
         "postprocess_version": POSTPROCESS_VERSION,
         "timestamp": datetime.now(timezone.utc).isoformat(),
