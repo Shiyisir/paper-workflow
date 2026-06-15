@@ -1,0 +1,9 @@
+# 英文期刊 LaTeX 投稿渲染 profile
+output: tex
+latex_template: templates/latex/journal.tex
+csl: templates/csl/apa.csl
+number_sections: true
+native_math: latex
+convert_svg_to: pdf
+toc: false
+postprocess: false
