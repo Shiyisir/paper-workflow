@@ -1,0 +1,11 @@
+# 中文学位论文渲染 profile
+output: docx
+reference_doc: templates/docx/thesis-cn-reference.docx
+csl: templates/csl/gb-t-7714.csl
+number_sections: false
+native_math: omml
+convert_svg_to: png
+toc: true
+toc_depth: 3
+caption_style: chinese
+postprocess: true

@@ -1,0 +1,69 @@
+% paper-workflow LaTeX template for journal submissions
+% Designed for xelatex/pdflatex with pandoc-generated content
+\documentclass[11pt,a4paper]{article}
+
+% === Encoding and fonts ===
+\usepackage{fontspec}
+\setmainfont{Latin Modern Roman}
+\setsansfont{Latin Modern Sans}
+\setmonofont{Latin Modern Mono}
+
+% === Page layout ===
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{setspace}
+\onehalfspacing
+
+% === Math ===
+\usepackage{amsmath,amssymb,amsfonts}
+
+% === Graphics ===
+\usepackage{graphicx}
+\graphicspath{{./figures/}}
+
+% === Tables ===
+\usepackage{booktabs}
+\usepackage{longtable}
+
+% === Hyperlinks ===
+\usepackage{hyperref}
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    citecolor=blue,
+    urlcolor=blue,
+}
+
+% === Captions ===
+\usepackage{caption}
+\usepackage{subcaption}
+
+% === Bibliography ===
+% Use citeproc-generated bibliography (pandoc --citeproc)
+% Or switch to biblatex:
+% \usepackage[backend=biber,style=apa]{biblatex}
+% \addbibresource{literature/references.bib}
+
+% === Metadata (filled by pandoc --metadata-file) ===
+\title{$title$}
+\author{$author$}
+\date{$date$}
+
+\begin{document}
+
+\maketitle
+
+% === Abstract ===
+\begin{abstract}
+$abstract$
+\end{abstract}
+
+% === Keywords ===
+\noindent\textbf{Keywords:} $keywords$
+
+% === Body (pandoc inserts content here) ===
+$body$
+
+% === Bibliography (if using citeproc) ===
+% $bibliography$ will be replaced by pandoc --citeproc
+
+\end{document}

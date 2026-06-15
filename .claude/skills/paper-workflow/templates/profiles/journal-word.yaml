@@ -1,0 +1,10 @@
+# 英文期刊 Word 提交渲染 profile
+output: docx
+reference_doc: templates/docx/journal-word-reference.docx
+csl: templates/csl/apa.csl
+number_sections: true
+native_math: omml
+convert_svg_to: png
+toc: false
+caption_style: english
+postprocess: true

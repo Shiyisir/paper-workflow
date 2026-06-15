@@ -1,0 +1,8 @@
+# 快速草稿渲染 profile（无引用格式）
+output: md
+csl: null
+number_sections: false
+native_math: raw
+convert_svg_to: none
+toc: false
+postprocess: false
