@@ -1,0 +1,97 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Literature Record",
+  "description": "Schema for a single record in catalog.jsonl",
+  "type": "object",
+  "required": ["canonical_id", "citekey", "title", "authors", "year", "language", "sources", "screening_status"],
+  "properties": {
+    "canonical_id": {
+      "type": "string",
+      "description": "Unique internal identifier (ref-0001, ref-0002, ...)",
+      "pattern": "^ref-\\d{4}$"
+    },
+    "citekey": {
+      "type": "string",
+      "description": "Stable citation key (e.g., wang2024RockyDesertification)",
+      "minLength": 3
+    },
+    "title": {
+      "type": "string",
+      "description": "Full paper title",
+      "minLength": 1
+    },
+    "authors": {
+      "type": "array",
+      "items": { "type": "string" },
+      "minItems": 1,
+      "description": "Author list in 'Last, First' or 'Last, F.' format"
+    },
+    "year": {
+      "type": "integer",
+      "minimum": 1500,
+      "maximum": 2100
+    },
+    "doi": {
+      "type": ["string", "null"],
+      "description": "DOI in any format (will be normalized)"
+    },
+    "journal": {
+      "type": ["string", "null"]
+    },
+    "volume": {
+      "type": ["string", "null"]
+    },
+    "pages": {
+      "type": ["string", "null"]
+    },
+    "abstract": {
+      "type": ["string", "null"]
+    },
+    "keywords": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "language": {
+      "type": "string",
+      "enum": ["en", "zh", "other"]
+    },
+    "sources": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["cnki", "scopus", "pubmed", "crossref", "arxiv", "sciencedirect", "manual", "other"]
+      },
+      "minItems": 1,
+      "description": "Which databases this record came from"
+    },
+    "fulltext_available": {
+      "type": "boolean"
+    },
+    "fulltext_path": {
+      "type": ["string", "null"],
+      "description": "Relative path to downloaded PDF"
+    },
+    "related_versions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["source", "id", "relation"],
+        "properties": {
+          "source": { "type": "string" },
+          "id": { "type": "string" },
+          "relation": {
+            "type": "string",
+            "enum": ["preprint_of", "published_version_of", "updated_version_of", "translation_of"]
+          }
+        }
+      }
+    },
+    "screening_status": {
+      "type": "string",
+      "enum": ["pending", "included", "excluded", "maybe"]
+    },
+    "screening_notes": {
+      "type": "string"
+    }
+  }
+}

@@ -1,0 +1,59 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Render Profile",
+  "description": "Schema for templates/profiles/*.yaml",
+  "type": "object",
+  "required": ["output", "native_math"],
+  "properties": {
+    "output": {
+      "type": "string",
+      "enum": ["docx", "tex", "md"],
+      "description": "Target output format"
+    },
+    "reference_doc": {
+      "type": ["string", "null"],
+      "description": "Path to reference.docx (docx profiles only)"
+    },
+    "latex_template": {
+      "type": ["string", "null"],
+      "description": "Path to LaTeX template (tex profiles only)"
+    },
+    "csl": {
+      "type": ["string", "null"],
+      "description": "Path to CSL citation style file"
+    },
+    "number_sections": {
+      "type": "boolean",
+      "description": "Enable pandoc --number-sections"
+    },
+    "native_math": {
+      "type": "string",
+      "enum": ["omml", "latex", "raw"],
+      "description": "Math rendering mode for pandoc"
+    },
+    "convert_svg_to": {
+      "type": "string",
+      "enum": ["png", "pdf", "none"],
+      "description": "SVG conversion target format"
+    },
+    "toc": {
+      "type": "boolean",
+      "description": "Generate table of contents"
+    },
+    "toc_depth": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 6,
+      "description": "TOC heading depth"
+    },
+    "caption_style": {
+      "type": "string",
+      "enum": ["chinese", "english"],
+      "description": "Caption numbering style"
+    },
+    "postprocess": {
+      "type": "boolean",
+      "description": "Run postprocess_docx.py after rendering"
+    }
+  }
+}
