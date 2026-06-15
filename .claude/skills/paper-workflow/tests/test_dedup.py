@@ -305,3 +305,85 @@ class TestCLI:
         report_text = report_path.read_text(encoding="utf-8")
         assert "去重报告" in report_text
         assert "统计摘要" in report_text
+
+
+class TestGenerateReport:
+    """Tests for _generate_report — called directly (internal function)."""
+
+    def test_empty_catalog_generates_report(self):
+        result = dedup._generate_report(
+            {"unique": [], "merged": [], "related": [], "pending_review": []},
+            original_count=0, unique_count=0,
+        )
+        assert "去重报告" in result
+        assert "未发现重复文献" in result
+
+    def test_no_duplicates_report(self):
+        result = dedup._generate_report(
+            {"unique": [], "merged": [], "related": [], "pending_review": []},
+            original_count=3, unique_count=3,
+        )
+        assert "去重率" in result
+        assert "0.0%" in result
+
+    def test_statistics_match_dedup_result(self):
+        result = dedup._generate_report(
+            {"unique": [], "merged": [], "related": [], "pending_review": []},
+            original_count=10, unique_count=7,
+        )
+        assert "30.0%" in result  # 3 removed = 30%
+
+    def test_pending_review_includes_reason(self):
+        result = dedup._generate_report(
+            {
+                "unique": [],
+                "merged": [],
+                "related": [],
+                "pending_review": [
+                    {
+                        "record_a": "ref-0001",
+                        "record_b": "ref-0002",
+                        "similarity": 0.75,
+                        "reason": "疑似跨语言重复",
+                    }
+                ],
+            },
+            original_count=2, unique_count=2,
+        )
+        assert "待人工审核" in result
+        assert "ref-0001" in result
+        assert "ref-0002" in result
+        assert "疑似跨语言重复" in result
+
+    def test_related_versions_includes_reason(self):
+        result = dedup._generate_report(
+            {
+                "unique": [],
+                "merged": [],
+                "related": [
+                    {
+                        "records": ["ref-0001", "ref-0002"],
+                        "relation": "preprint_published",
+                        "reason": "DOI match: one is preprint, one is published",
+                    }
+                ],
+                "pending_review": [],
+            },
+            original_count=2, unique_count=2,
+        )
+        assert "关联版本" in result
+        assert "preprint" in result.lower()
+
+    def test_merged_records_list_sources(self):
+        records = [
+            _make_record("ref-0001", "test2024A", "Test Paper",
+                         ["Test, A."], 2024, doi="10.1234/test",
+                         sources=["scopus"]),
+            _make_record("ref-0002", "test2024B", "Test Paper",
+                         ["Test, A."], 2024, doi="10.1234/test",
+                         sources=["crossref"]),
+        ]
+        dedup_result = dedup.deduplicate(records)
+        report = dedup._generate_report(dedup_result, 2, len(dedup_result["unique"]))
+        assert "scopus" in report
+        assert "crossref" in report
