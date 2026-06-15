@@ -21,6 +21,7 @@ import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from svg_utils import convert_svg_references
 from validate_manuscript import validate_manuscript
 
 SKILL_DIR = Path(__file__).resolve().parent.parent
@@ -200,7 +201,14 @@ def render(
             }
         warnings.extend(validation["warnings"])
 
-    # 2. Determine output
+    # 2. SVG check
+    operations.append("check_svg_references")
+    svg_result = convert_svg_references(profile, input_md, project_dir)
+    if svg_result["svg_count"] > 0:
+        operations.append(f"svg: {svg_result['svg_count']} refs, converter={svg_result['converter'] or 'none'}")
+    warnings.extend(svg_result["warnings"])
+
+    # 3. Determine output
     stem = _stem_from_profile(profile_name)
     suffix_map = {"docx": "docx", "tex": "tex", "md": "md"}
     suffix = suffix_map.get(output_fmt, output_fmt)
