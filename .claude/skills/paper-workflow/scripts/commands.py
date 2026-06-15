@@ -99,7 +99,7 @@ def cmd_status(verbose: bool = False) -> int:
     if blocked:
         print("阻塞的阶段:")
         for b in blocked:
-            print(f"  ✗ {b['stage_id']}")
+            print(f"  [BLOCKED] {b['stage_id']}")
             for reason in b.get("blockers", []):
                 print(f"    原因: {reason}")
         print()
@@ -135,7 +135,7 @@ def cmd_status(verbose: bool = False) -> int:
     # Overrides
     overrides = state.get("overrides", [])
     if overrides:
-        print(f"\n⚠ 强制推进记录 ({len(overrides)} 次):")
+        print(f"\n[WARN] 强制推进记录 ({len(overrides)} 次):")
         for o in overrides[-5:]:  # Last 5 only
             print(f"  - [{o.get('timestamp', '')[:19]}] {o.get('stage', '')}: {o.get('reason', '')}")
 
@@ -260,7 +260,7 @@ def cmd_run(stage_id: str, override: bool = False) -> int:
         return 1
 
     if result["overridden"]:
-        print(f"⚠ 已跳过依赖检查，强制执行 '{stage_id}'。")
+        print(f"[WARN] 已跳过依赖检查，强制执行 '{stage_id}'。")
 
     print(f"执行阶段: {stage_id} ({current_status} → in_progress)")
 

@@ -38,10 +38,10 @@ def fetch_style(key: str) -> bool:
     try:
         print(f"Downloading {info['url']} ...")
         urlretrieve(info["url"], dest)
-        print(f"  ✓ saved to {dest}")
+        print(f"  [OK] saved to {dest}")
         return True
     except Exception as e:
-        print(f"  ✗ failed: {e}")
+        print(f"  [FAIL] failed: {e}")
         return False
 
 

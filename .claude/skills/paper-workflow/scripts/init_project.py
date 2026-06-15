@@ -317,18 +317,18 @@ def init_project(project_dir: Path, params: dict, force: bool = False) -> bool:
     state_path = project_dir / ".paper-workflow" / "state.yaml"
     with open(state_path, "w", encoding="utf-8") as f:
         yaml.dump(state, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
-    print(f"  ✓ {state_path}")
+    print(f"  [OK] {state_path}")
 
     # Write config.yaml
     config_path = project_dir / ".paper-workflow" / "config.yaml"
     with open(config_path, "w", encoding="utf-8") as f:
         yaml.dump(config, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
-    print(f"  ✓ {config_path}")
+    print(f"  [OK] {config_path}")
 
     # Write artifact-manifest.jsonl (empty)
     manifest_path = project_dir / ".paper-workflow" / "artifact-manifest.jsonl"
     manifest_path.write_text("", encoding="utf-8")
-    print(f"  ✓ {manifest_path}")
+    print(f"  [OK] {manifest_path}")
 
     # Print summary
     skipped_stages = [

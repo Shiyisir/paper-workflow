@@ -278,10 +278,13 @@ def main():
 
     project_dir = Path(args.project) if args.project else _find_project_root()
 
+    input_md = (project_dir / args.input).resolve()
+    output_dir = (project_dir / args.output_dir).resolve()
+
     result = render(
         args.profile,
-        Path(args.input),
-        Path(args.output_dir),
+        input_md,
+        output_dir,
         project_dir,
         args.dry_run,
     )
@@ -304,7 +307,7 @@ def main():
             print(f"  ⚠ {w}")
 
     if result["success"] and not result["dry_run"]:
-        print(f"\n✓ 输出: {result['output_path']}")
+        print(f"\n[OK] 输出: {result['output_path']}")
 
     return 0 if result["success"] else 1
 
