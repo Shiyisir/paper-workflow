@@ -190,7 +190,7 @@ def render(
     # 1. Pre-render validation
     operations.append("validate_manuscript")
     if not dry_run:
-        validation = validate_manuscript(input_md, profile=profile_name)
+        validation = validate_manuscript(input_md, base_dir=project_dir, profile=profile_name)
         if validation["has_errors"]:
             errors.extend(validation["errors"])
             return {
