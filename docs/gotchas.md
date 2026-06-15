@@ -41,6 +41,13 @@
 
 ---
 
+## paper-workflow
+
+- [2026-06-15] **Windows GBK 终端 Unicode 崩溃**：print(\"✓\") 在 Windows Git Bash 中抛出 UnicodeEncodeError → scripts 中 print 只使用 ASCII（用 [OK]/[FAIL]/[WARN] 替代 Unicode 符号）。Markdown 报告文件（utf-8 写入）不受影响。
+- [2026-06-15] **render.py 相对路径陷阱**：--input manuscript/main.md 相对于 cwd 而非 --project → 在 CLI 入口用 project_dir / args.input 解析。
+
+---
+
 ## 待补充
 
 > 以下场景在使用中积累：
