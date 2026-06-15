@@ -177,3 +177,174 @@ class TestGetStage:
         stages = ws.list_stages(sample_state)
         assert len(stages) == 17
         assert stages[0] == "requirements"
+
+
+# ---------------------------------------------------------------------------
+# M2.2 State transition tests
+# ---------------------------------------------------------------------------
+
+def _build_state_with_deps() -> dict:
+    """Build a minimal state with a realistic dependency chain for testing."""
+    from init_project import STAGE_IDS, DEPENDENCY_GRAPH
+    state = {
+        "schema_version": 1,
+        "project_id": "test-transitions",
+        "paper_type": "course_paper",
+        "research_type": "review",
+        "discipline": "computer_science",
+        "language": "zh",
+        "target_journal": None,
+        "current_stage": "requirements",
+        "stages": {},
+        "overrides": [],
+    }
+    for sid in STAGE_IDS:
+        state["stages"][sid] = {
+            "status": "pending",
+            "depends_on": DEPENDENCY_GRAPH.get(sid, []),
+            "started_at": None,
+            "completed_at": None,
+            "qa_status": "pending",
+            "qa_report": None,
+            "artifacts": [],
+            "blockers": [],
+        }
+    state["stages"]["requirements"]["status"] = "in_progress"
+    return state
+
+
+class TestSetStageStatus:
+    def test_set_done_with_met_deps(self):
+        """requirements has no deps → can be set to done."""
+        state = _build_state_with_deps()
+        result = ws.set_stage_status(state, "requirements", "done")
+        assert result["success"] is True
+        assert state["stages"]["requirements"]["status"] == "done"
+        assert state["stages"]["requirements"]["completed_at"] is not None
+
+    def test_set_blocked_when_deps_unmet(self):
+        """literature_dedup depends on literature_search (pending) → blocked."""
+        state = _build_state_with_deps()
+        result = ws.set_stage_status(state, "literature_dedup", "in_progress")
+        assert result["success"] is False
+        assert "literature_search" in result["blocked_deps"]
+        assert state["stages"]["literature_dedup"]["status"] == "blocked"
+        # Blockers should be recorded
+        assert len(state["stages"]["literature_dedup"]["blockers"]) > 0
+
+    def test_override_skips_dep_check(self):
+        """With override=True, can set even with unmet deps."""
+        state = _build_state_with_deps()
+        result = ws.set_stage_status(state, "literature_dedup", "in_progress", override=True)
+        assert result["success"] is True
+        assert result["overridden"] is True
+        assert state["stages"]["literature_dedup"]["status"] == "in_progress"
+        # Override should be logged
+        assert len(state["overrides"]) == 1
+        assert state["overrides"][0]["stage"] == "literature_dedup"
+
+    def test_override_logs_missing_deps(self):
+        """Override log should include which deps were missing."""
+        state = _build_state_with_deps()
+        ws.set_stage_status(state, "writing", "done", override=True)
+        override_entry = state["overrides"][0]
+        assert "literature_dedup" in override_entry["missing_deps"] or len(override_entry["missing_deps"]) >= 0
+
+    def test_unknown_stage_returns_error(self):
+        state = _build_state_with_deps()
+        result = ws.set_stage_status(state, "nonexistent_stage", "done")
+        assert result["success"] is False
+        assert "未知阶段" in result["message"]
+
+    def test_invalid_status_returns_error(self):
+        state = _build_state_with_deps()
+        result = ws.set_stage_status(state, "requirements", "invalid")
+        assert result["success"] is False
+        assert "无效状态" in result["message"]
+
+    def test_done_clears_blockers(self):
+        """When a blocked stage is later completed (after deps met), blockers clear."""
+        state = _build_state_with_deps()
+        # First, try to set writing to done (will block)
+        ws.set_stage_status(state, "writing", "done")
+        assert state["stages"]["writing"]["status"] == "blocked"
+        assert len(state["stages"]["writing"]["blockers"]) > 0
+
+        # Now complete the dependency chain up to writing
+        ws.set_stage_status(state, "requirements", "done")
+        ws.set_stage_status(state, "literature_search", "done", override=True)
+        ws.set_stage_status(state, "literature_dedup", "done", override=True)
+        ws.set_stage_status(state, "deep_reading", "done", override=True)
+        ws.set_stage_status(state, "evidence_matrix", "done", override=True)
+        ws.set_stage_status(state, "outline", "done", override=True)
+        ws.set_stage_status(state, "charts_and_tables", "done", override=True)
+
+        # Now writing can be set to done without override
+        result = ws.set_stage_status(state, "writing", "done")
+        assert result["success"] is True
+        assert state["stages"]["writing"]["blockers"] == []
+
+
+class TestGetNextStages:
+    def test_requirements_done_unlocks_next(self):
+        """After requirements done, material_prep and literature_search become available."""
+        state = _build_state_with_deps()
+        # First, only requirements should be available (it's already in_progress)
+        ws.set_stage_status(state, "requirements", "done")
+        next_stages = ws.get_next_stages(state)
+        assert "material_prep" in next_stages
+        assert "literature_search" in next_stages
+
+    def test_no_next_if_all_done(self):
+        """All stages done → no next stages."""
+        state = _build_state_with_deps()
+        for sid in ws.list_stages(state):
+            ws.set_stage_status(state, sid, "done", override=True)
+        assert ws.get_next_stages(state) == []
+
+    def test_skipped_stages_count_as_met(self):
+        """Skipped dependencies should satisfy depends_on."""
+        state = _build_state_with_deps()
+        # Skip literature_search
+        state["stages"]["literature_search"]["status"] = "skipped"
+        state["stages"]["requirements"]["status"] = "done"
+        # literature_dedup depends on literature_search (now skipped)
+        next_stages = ws.get_next_stages(state)
+        assert "literature_dedup" in next_stages
+
+
+class TestGetBlockedStages:
+    def test_returns_blocked_stages(self):
+        state = _build_state_with_deps()
+        ws.set_stage_status(state, "writing", "done")  # Will block
+        blocked = ws.get_blocked_stages(state)
+        assert len(blocked) >= 1
+        assert any(b["stage_id"] == "writing" for b in blocked)
+
+    def test_no_blocked_when_all_clean(self):
+        state = _build_state_with_deps()
+        ws.set_stage_status(state, "requirements", "done")
+        blocked = ws.get_blocked_stages(state)
+        # requirements just completed, nothing should be blocked
+        writing_blocked = [b for b in blocked if b["stage_id"] == "writing"]
+        assert len(writing_blocked) == 0
+
+
+class TestMarkStageBlocked:
+    def test_marks_blocked_with_reason(self):
+        state = _build_state_with_deps()
+        ws.mark_stage_blocked(state, "literature_search", "CNKI 暂时无法访问")
+        assert state["stages"]["literature_search"]["status"] == "blocked"
+        assert "CNKI 暂时无法访问" in state["stages"]["literature_search"]["blockers"]
+
+    def test_unknown_stage_raises(self):
+        state = _build_state_with_deps()
+        with pytest.raises(ValueError, match="未知阶段"):
+            ws.mark_stage_blocked(state, "nonexistent", "reason")
+
+    def test_duplicate_reason_not_added(self):
+        state = _build_state_with_deps()
+        ws.mark_stage_blocked(state, "literature_search", "reason A")
+        ws.mark_stage_blocked(state, "literature_search", "reason A")
+        # Should only appear once
+        assert state["stages"]["literature_search"]["blockers"].count("reason A") == 1

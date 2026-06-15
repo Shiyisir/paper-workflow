@@ -226,3 +226,167 @@ def get_stages_by_status(state: dict, status: str) -> list[str]:
         sid for sid, s in state.get("stages", {}).items()
         if s.get("status") == status
     ]
+
+
+# ---------------------------------------------------------------------------
+# Stage transition logic (M2.2)
+# ---------------------------------------------------------------------------
+
+def _check_dependencies(state: dict, stage_id: str) -> list[str]:
+    """Return list of unmet dependencies for a stage.
+
+    A dependency is unmet if its status is NOT 'done' or 'skipped'.
+    """
+    stage = get_stage(state, stage_id)
+    if stage is None:
+        return [f"阶段 '{stage_id}' 不存在"]
+
+    unmet = []
+    for dep_id in stage.get("depends_on", []):
+        if not is_stage_done(state, dep_id):
+            unmet.append(dep_id)
+    return unmet
+
+
+def set_stage_status(
+    state: dict,
+    stage_id: str,
+    status: str,
+    override: bool = False,
+) -> dict:
+    """Attempt to set a stage's status.
+
+    Args:
+        state: The full state dict (mutated in place).
+        stage_id: Target stage identifier.
+        status: Target status ('in_progress', 'done', etc.).
+        override: If True, skip dependency checking and log to overrides.
+
+    Returns:
+        {
+            "success": bool,
+            "message": str,
+            "blocked_deps": [str, ...],   # unmet dependencies (if any)
+            "overridden": bool,
+        }
+    """
+    now = datetime.now(timezone.utc).isoformat()
+    stage = get_stage(state, stage_id)
+
+    if stage is None:
+        return {
+            "success": False,
+            "message": f"未知阶段: '{stage_id}'。可用阶段: {', '.join(list_stages(state))}",
+            "blocked_deps": [],
+            "overridden": False,
+        }
+
+    valid_statuses = {"pending", "in_progress", "done", "skipped", "blocked"}
+    if status not in valid_statuses:
+        return {
+            "success": False,
+            "message": f"无效状态: '{status}'。有效值: {valid_statuses}",
+            "blocked_deps": [],
+            "overridden": False,
+        }
+
+    if not override:
+        # Check dependencies
+        unmet = _check_dependencies(state, stage_id)
+        if unmet:
+            # Mark as blocked instead
+            stage["status"] = "blocked"
+            stage["blockers"] = [
+                f"前置阶段未完成: {', '.join(unmet)}",
+            ]
+            state["current_stage"] = stage_id
+            return {
+                "success": False,
+                "message": f"阶段 '{stage_id}' 被阻塞。未完成的依赖: {', '.join(unmet)}",
+                "blocked_deps": unmet,
+                "overridden": False,
+            }
+
+    # Proceed with status change
+    if override and status in ("done", "in_progress"):
+        # Log the override
+        unmet = _check_dependencies(state, stage_id)
+        overrides = state.setdefault("overrides", [])
+        overrides.append({
+            "stage": stage_id,
+            "timestamp": now,
+            "reason": f"强制推进: {status}",
+            "missing_deps": unmet,
+        })
+
+    old_status = stage.get("status")
+    stage["status"] = status
+    state["current_stage"] = stage_id
+
+    if status == "in_progress" and old_status != "in_progress":
+        stage["started_at"] = now
+    elif status == "done":
+        stage["completed_at"] = now
+        # Clear blockers on successful completion
+        stage["blockers"] = []
+
+    return {
+        "success": True,
+        "message": f"阶段 '{stage_id}': {old_status} → {status}",
+        "blocked_deps": [],
+        "overridden": override,
+    }
+
+
+def get_next_stages(state: dict) -> list[str]:
+    """Return stages where all depends_on are satisfied and status is 'pending'.
+
+    Does NOT return stages that are blocked, in_progress, done, or skipped.
+    """
+    next_stages = []
+    for sid in list_stages(state):
+        stage = get_stage(state, sid)
+        if stage is None:
+            continue
+        if stage.get("status") != "pending":
+            continue
+        unmet = _check_dependencies(state, sid)
+        if not unmet:
+            next_stages.append(sid)
+    return next_stages
+
+
+def get_blocked_stages(state: dict) -> list[dict]:
+    """Return list of blocked stages with their reasons.
+
+    Each item: {"stage_id": str, "blockers": [str], "status": str}
+    """
+    blocked = []
+    for sid in list_stages(state):
+        stage = get_stage(state, sid)
+        if stage is None:
+            continue
+        if stage.get("status") == "blocked":
+            blocked.append({
+                "stage_id": sid,
+                "blockers": stage.get("blockers", []),
+                "status": "blocked",
+            })
+    return blocked
+
+
+def mark_stage_blocked(state: dict, stage_id: str, reason: str) -> None:
+    """Mark a stage as blocked with a custom reason.
+
+    Raises ValueError if the stage doesn't exist.
+    Mutates state in place.
+    """
+    stage = get_stage(state, stage_id)
+    if stage is None:
+        raise ValueError(f"未知阶段: '{stage_id}'")
+    stage["status"] = "blocked"
+    blockers = stage.get("blockers", [])
+    if reason not in blockers:
+        blockers.append(reason)
+    stage["blockers"] = blockers
+    state["current_stage"] = stage_id
