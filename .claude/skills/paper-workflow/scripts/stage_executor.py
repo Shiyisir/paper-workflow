@@ -555,18 +555,137 @@ def _execute_skill_handoff_stage(
     state: dict,
     config: dict,
 ) -> dict:
-    """Generate a skill handoff task package. STUB in v0.2 — M4 will implement."""
-    return {
+    """Generate a skill handoff task package (M4: real implementation)."""
+    base = {
         "executed": False,
         "stage_id": stage_id,
         "executor_type": "skill_handoff",
         "recommended_status": "waiting_for_user",
-        "handoff_generated": True,
+        "handoff_generated": False,
         "requires_confirmation": True,
         "artifacts": [],
-        "warnings": ["[v0.2 stub] skill_handoff executor not yet implemented"],
+        "warnings": [],
         "blocked_reason": None,
     }
+
+    try:
+        handoff_path = generate_handoff(stage_id, project_dir, state, config)
+        base["handoff_generated"] = True
+        base["handoff_path"] = str(handoff_path.relative_to(project_dir))
+        base["artifacts"] = [base["handoff_path"]]
+        return base
+    except Exception as e:
+        base["warnings"].append(f"Handoff generation error: {e}")
+        # Still return waiting_for_user — handoff failed but shouldn't block
+        return base
+
+
+# ---------------------------------------------------------------------------
+# M4.2: Handoff file generation
+# ---------------------------------------------------------------------------
+
+def generate_handoff(
+    stage_id: str,
+    project_dir: Path,
+    state: dict,
+    config: dict,
+) -> Path:
+    """Generate a skill handoff JSON file and return its path.
+
+    Writes to .paper-workflow/handoffs/<stage_id>.json
+    Updates .paper-workflow/handoffs/latest.json
+    """
+    import json as _json
+    from datetime import datetime, timezone
+
+    contract = load_contract(stage_id)
+
+    # Render the handoff prompt
+    from stage_prompts import render_handoff_prompt
+    task_prompt = render_handoff_prompt(stage_id, project_dir, state, config)
+
+    # Collect input artifact status
+    input_files = {}
+    warnings = []
+    for art in contract.get("input_artifacts", []):
+        optional = art.startswith("optional:")
+        clean_path = art[len("optional:"):] if optional else art
+        target = project_dir / clean_path
+
+        entry = {"exists": target.exists(), "optional": optional}
+        if target.is_file():
+            entry["size_bytes"] = target.stat().st_size
+        elif target.is_dir():
+            try:
+                files = [f.name for f in target.iterdir() if f.is_file()]
+                entry["file_count"] = len(files)
+            except Exception:
+                entry["file_count"] = 0
+
+        if not entry["exists"] and not optional:
+            warnings.append(f"required input missing: {clean_path}")
+        elif not entry["exists"] and optional:
+            pass  # optional missing is not a warning
+
+        input_files[clean_path] = entry
+
+    # Collect materials summary
+    materials_list: list[str] = []
+    materials_dir = project_dir / "materials"
+    if materials_dir.is_dir():
+        for sub in ["requirements", "templates", "examples", "notes"]:
+            sub_dir = materials_dir / sub
+            if sub_dir.is_dir():
+                for f in sorted(sub_dir.iterdir()):
+                    if f.is_file() and not f.name.startswith("."):
+                        materials_list.append(f"materials/{sub}/{f.name}")
+
+    # Build expected outputs
+    expected_outputs = contract.get("output_artifacts", [])
+
+    # Resolve skill name
+    from stage_prompts import _resolve_skill
+    skill_name = _resolve_skill(contract, config)
+
+    handoff_data = {
+        "stage_id": stage_id,
+        "executor_type": "skill_handoff",
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "status": "waiting_for_user",
+        "skill": skill_name,
+        "task_prompt": task_prompt,
+        "input_files": input_files,
+        "expected_outputs": expected_outputs,
+        "materials_summary": materials_list,
+        "warnings": warnings,
+        "retry_count": 0,
+    }
+
+    # Write handoff JSON
+    handoffs_dir = project_dir / ".paper-workflow" / "handoffs"
+    handoffs_dir.mkdir(parents=True, exist_ok=True)
+
+    handoff_path = handoffs_dir / f"{stage_id}.json"
+    handoff_path.write_text(
+        _json.dumps(handoff_data, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+    # Update latest pointer
+    latest_path = handoffs_dir / "latest.json"
+    latest_path.write_text(
+        _json.dumps({"stage_id": stage_id, "timestamp": handoff_data["generated_at"]}, ensure_ascii=False),
+        encoding="utf-8",
+    )
+
+    # Log artifact
+    log_artifacts(
+        project_dir, stage_id,
+        [f".paper-workflow/handoffs/{stage_id}.json"],
+        f"skill_handoff:{skill_name}",
+    )
+
+    return handoff_path
 
 
 def _execute_manual_stage(

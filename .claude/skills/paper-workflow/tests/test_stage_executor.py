@@ -436,3 +436,104 @@ class TestM3Integration:
         assert r3["recommended_status"] == "done"
         r4 = se.execute_stage("quality_qa", root, state, config)
         assert r4["executed"] is True
+
+
+# ===== M4: Skill Handoff =====
+
+class TestHandoffGeneration:
+    def _setup(self, tmp_path):
+        root = _make_project(tmp_path)
+        (root / "materials" / "requirements").mkdir(parents=True, exist_ok=True)
+        (root / "materials" / "templates").mkdir(parents=True, exist_ok=True)
+        (root / "materials" / "examples").mkdir(parents=True, exist_ok=True)
+        (root / "materials" / "notes").mkdir(parents=True, exist_ok=True)
+        state = {"project_id": "t", "paper_type": "course_paper", "research_type": "review",
+                 "discipline": "computer_science", "language": "zh"}
+        config = {"project_id": "t", "paper_type": "course_paper", "research_type": "review",
+                  "discipline": "computer_science", "language": "zh", "search_mode": "standard"}
+        return root, state, config
+
+    def test_outline_handoff_generated(self, tmp_path):
+        root, state, config = self._setup(tmp_path)
+        r = se.execute_stage("outline", root, state, config)
+        assert r["handoff_generated"] is True
+        assert r["recommended_status"] == "waiting_for_user"
+        hp = root / ".paper-workflow" / "handoffs" / "outline.json"
+        assert hp.exists()
+
+    def test_writing_handoff_generated(self, tmp_path):
+        root, state, config = self._setup(tmp_path)
+        r = se.execute_stage("writing", root, state, config)
+        assert r["handoff_generated"] is True
+        assert (root / ".paper-workflow" / "handoffs" / "writing.json").exists()
+
+    def test_deep_reading_handoff_generated(self, tmp_path):
+        root, state, config = self._setup(tmp_path)
+        r = se.execute_stage("deep_reading", root, state, config)
+        assert r["handoff_generated"] is True
+        assert (root / ".paper-workflow" / "handoffs" / "deep_reading.json").exists()
+
+    def test_handoff_json_contains_expected_fields(self, tmp_path):
+        root, state, config = self._setup(tmp_path)
+        se.execute_stage("outline", root, state, config)
+        import json as j
+        data = j.loads((root / ".paper-workflow" / "handoffs" / "outline.json").read_text(encoding="utf-8"))
+        assert data["stage_id"] == "outline"
+        assert "nature-writing" in data["skill"]
+        assert len(data["task_prompt"]) > 50
+        assert "expected_outputs" in data
+        assert "input_files" in data
+        assert "materials_summary" in data
+
+    def test_multiple_handoffs_no_overwrite(self, tmp_path):
+        root, state, config = self._setup(tmp_path)
+        se.execute_stage("outline", root, state, config)
+        se.execute_stage("writing", root, state, config)
+        hd = root / ".paper-workflow" / "handoffs"
+        assert (hd / "outline.json").exists()
+        assert (hd / "writing.json").exists()
+
+    def test_latest_json_updated(self, tmp_path):
+        root, state, config = self._setup(tmp_path)
+        se.execute_stage("outline", root, state, config)
+        import json as j
+        latest = j.loads((root / ".paper-workflow" / "handoffs" / "latest.json").read_text(encoding="utf-8"))
+        assert latest["stage_id"] == "outline"
+
+    def test_all_6_skill_handoff_stages(self, tmp_path):
+        root, state, config = self._setup(tmp_path)
+        stages = ["literature_search", "deep_reading", "outline", "writing", "polishing", "charts_and_tables"]
+        for sid in stages:
+            r = se.execute_stage(sid, root, state, config)
+            assert r["handoff_generated"] is True, f"{sid} handoff not generated"
+            assert r["recommended_status"] == "waiting_for_user", f"{sid} wrong status"
+
+    def test_handoff_with_materials_file(self, tmp_path):
+        root, state, config = self._setup(tmp_path)
+        (root / "materials" / "requirements" / "guide.md").write_text("# Guide", encoding="utf-8")
+        r = se.execute_stage("outline", root, state, config)
+        import json as j
+        data = j.loads((root / ".paper-workflow" / "handoffs" / "outline.json").read_text(encoding="utf-8"))
+        assert any("guide.md" in m for m in data.get("materials_summary", []))
+
+    def test_missing_materials_not_blocked(self, tmp_path):
+        root, state, config = self._setup(tmp_path)
+        import shutil
+        mats = root / "materials"
+        if mats.exists():
+            shutil.rmtree(mats)
+        r = se.execute_stage("outline", root, state, config)
+        assert r["handoff_generated"] is True
+
+    def test_does_not_write_state(self, tmp_path):
+        root, state, config = self._setup(tmp_path)
+        sp = root / ".paper-workflow" / "state.yaml"
+        if sp.exists():
+            sp.unlink()
+        se.execute_stage("outline", root, state, config)
+        assert not sp.exists()
+
+    def test_writes_manifest(self, tmp_path):
+        root, state, config = self._setup(tmp_path)
+        se.execute_stage("outline", root, state, config)
+        assert (root / ".paper-workflow" / "artifact-manifest.jsonl").exists()
