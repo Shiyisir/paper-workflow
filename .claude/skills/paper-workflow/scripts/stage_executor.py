@@ -692,8 +692,77 @@ def _execute_manual_stage(
     stage_id: str,
     contract: dict,
     project_dir: Path,
+    state: dict | None = None,
+    config: dict | None = None,
 ) -> dict:
-    """Print manual task instructions. STUB in v0.2 — M5 will implement."""
+    """Generate structured task instructions for manual stages (M5)."""
+    phase_label = contract.get("phase_label", stage_id)
+    is_future = contract.get("not_in_v0.2_mvp", False)
+    outputs = contract.get("output_artifacts", [])
+    preconditions = contract.get("preconditions", [])
+    done_cond = contract.get("done_conditions", [])
+    inputs = contract.get("input_artifacts", [])
+
+    # Check input files
+    available = []
+    missing = []
+    for art in inputs:
+        clean = art.replace("optional:", "")
+        if (project_dir / clean).exists():
+            available.append(clean)
+        elif not art.startswith("optional:"):
+            missing.append(clean)
+
+    # Build message
+    lines = []
+    lines.append(f"阶段 {stage_id}（{phase_label}）需要你手动完成：")
+    lines.append("")
+
+    if is_future:
+        lines.append("[FUTURE] 此阶段属于 v0.3 或以后版本，v0.2 暂不完整支持。")
+        lines.append("")
+
+    lines.append("任务说明：")
+    lines.append(_manual_task_description(stage_id))
+    lines.append("")
+
+    if inputs:
+        if available:
+            lines.append("可用输入：")
+            for a in available:
+                lines.append(f"  - {a}")
+        if missing:
+            lines.append("缺失输入（建议先补齐）：")
+            for m in missing:
+                lines.append(f"  - {m}")
+        lines.append("")
+
+    if outputs:
+        lines.append("期望输出：")
+        for o in outputs:
+            lines.append(f"  - {o}")
+        lines.append("")
+
+    if done_cond:
+        lines.append("完成条件：")
+        for d in done_cond:
+            lines.append(f"  - {d}")
+        lines.append("")
+
+    if preconditions:
+        lines.append("前置条件：")
+        for p in preconditions:
+            lines.append(f"  - {p}")
+        lines.append("")
+
+    lines.append("完成后运行以下命令确认：")
+    lines.append(f"  python scripts/commands.py confirm {stage_id} --project <project_dir>")
+    lines.append("")
+    lines.append("如需强制跳过条件检查：")
+    lines.append(f"  python scripts/commands.py confirm {stage_id} --project <project_dir> --override")
+
+    message = "\n".join(lines)
+
     return {
         "executed": False,
         "stage_id": stage_id,
@@ -701,10 +770,25 @@ def _execute_manual_stage(
         "recommended_status": "waiting_for_user",
         "handoff_generated": False,
         "requires_confirmation": True,
+        "requires_manual_action": True,
         "artifacts": [],
-        "warnings": ["[v0.2 stub] manual executor not yet implemented"],
+        "warnings": [],
         "blocked_reason": None,
+        "message": message,
     }
+
+
+def _manual_task_description(stage_id: str) -> str:
+    """Return a brief task description for each manual stage."""
+    descriptions = {
+        "requirements": "确认论文需求和研究问题。明确论文类型、目标期刊/课程要求、字数范围、引用格式等。",
+        "material_prep": "准备参考材料。将课程要求、格式规范、参考范文、导师意见等放入 materials/ 目录对应子文件夹。",
+        "research_design": "设计研究方案或实验方案。明确研究问题、方法路径、实验设计、评估指标。",
+        "data_analysis": "执行数据分析。运行实验、收集结果、分析数据、整理发现。",
+        "originality_check": "自查论文原创性。检查是否有未标注的引用、是否有抄袭风险、是否遵循学术诚信规范。",
+        "revision": "根据 QA 报告或导师反馈修订论文。修改内容、补全缺失引用、调整格式。",
+    }
+    return descriptions.get(stage_id, "根据项目配置和参考材料完成本阶段任务。")
 
 
 def _execute_hybrid_stage(
@@ -789,7 +873,7 @@ def execute_stage(
     elif executor_type == "skill_handoff":
         return _execute_skill_handoff_stage(stage_id, contract, project_dir, state, config)
     elif executor_type == "manual":
-        return _execute_manual_stage(stage_id, contract, project_dir)
+        return _execute_manual_stage(stage_id, contract, project_dir, state, config)
     elif executor_type == "hybrid":
         return _execute_hybrid_stage(stage_id, contract, project_dir, state, config)
     else:

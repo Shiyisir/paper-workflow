@@ -275,3 +275,121 @@ class TestProjectFlag:
         monkeypatch.chdir(empty)
         rc = commands.cmd_status()
         assert rc != 0
+
+
+# ===== M5.2: Confirm command =====
+
+class TestConfirm:
+    def _setup(self, tmp_path, stage_id="requirements", status="in_progress"):
+        """Create a project where a specific stage is in_progress."""
+        import yaml as _yaml
+        project = tmp_path / "test-project"
+        project.mkdir(parents=True)
+        pw_dir = project / ".paper-workflow"
+        pw_dir.mkdir()
+
+        # Build stages with one stage in the given status
+        from init_project import STAGE_IDS, DEPENDENCY_GRAPH
+        stages = {}
+        for sid in STAGE_IDS:
+            s_status = status if sid == stage_id else "pending"
+            stages[sid] = {
+                "status": s_status,
+                "depends_on": DEPENDENCY_GRAPH.get(sid, []),
+                "started_at": None, "completed_at": None,
+                "qa_status": "pending", "qa_report": None,
+                "artifacts": [], "blockers": [],
+            }
+
+        state = {
+            "schema_version": 1, "project_id": "test-001",
+            "paper_type": "course_paper", "research_type": "review",
+            "discipline": "computer_science", "language": "zh",
+            "target_journal": None, "current_stage": stage_id,
+            "stages": stages, "overrides": [],
+        }
+        with open(pw_dir / "state.yaml", "w", encoding="utf-8") as f:
+            _yaml.dump(state, f, allow_unicode=True)
+        config = {
+            "project_id": "test-001", "paper_type": "course_paper",
+            "search_mode": "standard",
+        }
+        with open(pw_dir / "config.yaml", "w", encoding="utf-8") as f:
+            _yaml.dump(config, f, allow_unicode=True)
+
+        # Create minimal done_condition artifacts for requirements
+        (project / "manuscript").mkdir(exist_ok=True)
+        (project / "manuscript" / "notes.md").write_text("# Notes", encoding="utf-8")
+
+        return project
+
+    def test_confirm_with_met_conditions(self, tmp_path, monkeypatch):
+        """requirements has done_condition: file_exists:manuscript/notes.md"""
+        project = self._setup(tmp_path, "requirements", "in_progress")
+        monkeypatch.chdir(project)
+        rc = commands.cmd_confirm("requirements")
+        assert rc == 0
+
+    def test_confirm_with_unmet_conditions(self, tmp_path, monkeypatch):
+        """formatting needs outputs/latest/ which doesn't exist."""
+        project = self._setup(tmp_path, "formatting", "in_progress")
+        monkeypatch.chdir(project)
+        rc = commands.cmd_confirm("formatting")
+        assert rc != 0  # blocked, conditions not met
+
+    def test_confirm_override_forced(self, tmp_path, monkeypatch):
+        """--override forces done even with unmet conditions."""
+        project = self._setup(tmp_path, "formatting", "in_progress")
+        monkeypatch.chdir(project)
+        rc = commands.cmd_confirm("formatting", override=True)
+        assert rc == 0  # override succeeds
+
+    def test_confirm_already_done(self, tmp_path, monkeypatch, capsys):
+        """Confirming an already-done stage returns cleanly."""
+        project = self._setup(tmp_path, "requirements", "done")
+        monkeypatch.chdir(project)
+        rc = commands.cmd_confirm("requirements")
+        assert rc == 0
+        captured = capsys.readouterr()
+        assert "已完成" in captured.out
+
+    def test_confirm_unknown_stage(self, tmp_path, monkeypatch):
+        project = self._setup(tmp_path)
+        monkeypatch.chdir(project)
+        rc = commands.cmd_confirm("nonexistent")
+        assert rc != 0
+
+    def test_confirm_override_logs_record(self, tmp_path, monkeypatch):
+        """Override logs to state overrides."""
+        project = self._setup(tmp_path, "formatting", "in_progress")
+        monkeypatch.chdir(project)
+        commands.cmd_confirm("formatting", override=True)
+        # Check state has override record
+        from workflow_state import load_state
+        loaded = load_state()
+        overrides = loaded["state"].get("overrides", [])
+        assert len(overrides) >= 1
+        assert overrides[-1]["stage"] == "formatting"
+
+    def test_confirm_skill_handoff_checks_stage_done(self, tmp_path, monkeypatch, capsys):
+        """skill_handoff confirm should check stage_done, not handoff_done."""
+        project = self._setup(tmp_path, "outline", "waiting_for_user")
+        monkeypatch.chdir(project)
+        rc = commands.cmd_confirm("outline")
+        # outline needs manuscript/outline.md — should fail
+        assert rc != 0
+        captured = capsys.readouterr()
+        assert "stage_done" in captured.out.lower() or "未满足条件" in captured.out
+
+    def test_run_still_uses_stub(self, tmp_path, monkeypatch):
+        """verify that run <stage> still uses the old _execute_stage stub (M7 not done)."""
+        project = self._setup(tmp_path, "requirements", "in_progress")
+        monkeypatch.chdir(project)
+        import commands as cmds
+        # run should still print stub message
+        old_run = getattr(cmds, 'cmd_run')
+        # We just verify the _execute_stage function still exists as stub
+        assert callable(cmds._execute_stage)
+        # and that it returns a dict with executed=False (stub behavior)
+        r = cmds._execute_stage("literature_dedup")
+        assert r.get("executed") is False

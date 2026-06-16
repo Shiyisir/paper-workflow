@@ -537,3 +537,51 @@ class TestHandoffGeneration:
         root, state, config = self._setup(tmp_path)
         se.execute_stage("outline", root, state, config)
         assert (root / ".paper-workflow" / "artifact-manifest.jsonl").exists()
+
+
+# ===== M5.1: Manual Stages =====
+
+class TestManualStages:
+    def _setup(self, tmp_path):
+        root = _make_project(tmp_path)
+        state = {"project_id": "t"}
+        config = {"project_id": "t"}
+        return root, state, config
+
+    def test_research_design_returns_manual(self, tmp_path):
+        root, state, config = self._setup(tmp_path)
+        r = se.execute_stage("research_design", root, state, config)
+        assert r["executor_type"] == "manual"
+        assert r["requires_manual_action"] is True
+        assert r["recommended_status"] == "waiting_for_user"
+        assert "message" in r
+        assert "research_design" in r["message"]
+
+    def test_requirements_returns_manual(self, tmp_path):
+        root, state, config = self._setup(tmp_path)
+        r = se.execute_stage("requirements", root, state, config)
+        assert r["requires_manual_action"] is True
+        assert "message" in r
+
+    def test_revision_marks_future(self, tmp_path):
+        root, state, config = self._setup(tmp_path)
+        r = se.execute_stage("revision", root, state, config)
+        assert r["requires_manual_action"] is True
+        assert "FUTURE" in r["message"] or "v0.3" in r["message"]
+
+    def test_all_6_manual_stages(self, tmp_path):
+        root, state, config = self._setup(tmp_path)
+        stages = ["requirements", "material_prep", "research_design", "data_analysis",
+                  "originality_check", "revision"]
+        for sid in stages:
+            r = se.execute_stage(sid, root, state, config)
+            assert r["executor_type"] == "manual", f"{sid} wrong executor_type"
+            assert "message" in r, f"{sid} missing message"
+
+    def test_manual_does_not_write_state(self, tmp_path):
+        root, state, config = self._setup(tmp_path)
+        sp = root / ".paper-workflow" / "state.yaml"
+        if sp.exists():
+            sp.unlink()
+        se.execute_stage("research_design", root, state, config)
+        assert not sp.exists()

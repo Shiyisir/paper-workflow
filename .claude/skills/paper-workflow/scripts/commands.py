@@ -26,6 +26,12 @@ from workflow_state import (
     set_stage_status,
     get_next_stages,
     get_blocked_stages,
+    mark_stage_blocked,
+)
+
+from stage_executor import (
+    load_contract,
+    check_done_conditions,
 )
 
 
@@ -306,6 +312,116 @@ def cmd_run(stage_id: str, override: bool = False, project: str | None = None) -
 
 
 # ---------------------------------------------------------------------------
+# Confirm command (M5.2: added in v0.2, does NOT replace _execute_stage)
+# ---------------------------------------------------------------------------
+
+def cmd_confirm(stage_id: str, override: bool = False, project: str | None = None) -> int:
+    """Confirm a stage as done after checking done conditions.
+
+    Rules:
+      - script/manual/hybrid: check contract['done_conditions']
+      - skill_handoff: check contract['stage_done'] (NOT handoff_done)
+      - --override skips checks and forces done
+    """
+    from datetime import datetime, timezone
+
+    root = _resolve_project_dir(project)
+    if root is None:
+        print("错误：未找到 paper-workflow 项目。")
+        return 1
+
+    try:
+        loaded = load_state(root)
+    except FileNotFoundError as e:
+        print(f"错误：{e}")
+        return 1
+
+    state = loaded["state"]
+
+    # Check stage exists
+    stage = get_stage(state, stage_id)
+    if stage is None:
+        valid = ", ".join(list_stages(state))
+        print(f"错误：未知阶段 '{stage_id}'。可用: {valid}")
+        return 1
+
+    current_status = stage.get("status")
+
+    # Already done?
+    if current_status == "done":
+        print(f"阶段 '{stage_id}' 已完成，无需确认。")
+        return 0
+
+    # Only allow confirm from certain states
+    allowed = {"in_progress", "waiting_for_user", "pending_confirmation", "blocked", "pending"}
+    if current_status not in allowed:
+        print(f"阶段 '{stage_id}' 当前状态为 '{current_status}'，无法确认。")
+        print(f"可确认的状态: {', '.join(sorted(allowed))}")
+        return 1
+
+    # Load contract to determine which conditions to check
+    try:
+        contract = load_contract(stage_id)
+    except Exception as e:
+        print(f"警告：无法加载 contract: {e}，使用基础 done_conditions 检查。")
+        contract = {}
+
+    executor_type = contract.get("executor_type", "manual")
+
+    if not override:
+        # Check appropriate conditions
+        all_met, unmet = check_done_conditions(stage_id, root)
+
+        if not all_met:
+            print(f"阶段 '{stage_id}' 尚不能确认完成。")
+            print()
+            print(f"未满足条件:")
+            for u in unmet:
+                print(f"  - {u}")
+            print()
+            marker = "stage_done" if executor_type == "skill_handoff" else "done_conditions"
+            print(f"（检查的是 contract 的 {marker} 字段）")
+            print()
+            print(f"请补齐产物后再次运行 confirm，或使用 --override 强制确认。")
+
+            # Optionally mark as blocked
+            if current_status not in ("blocked",):
+                mark_stage_blocked(state, stage_id, f"confirm 检查失败: {unmet}")
+                save_state(state, root)
+
+            return 1
+
+        # All conditions met
+        set_stage_status(state, stage_id, "done")
+        save_state(state, root)
+        print(f"[OK] 阶段 '{stage_id}' 已确认完成（{executor_type}）。")
+        return 0
+
+    else:
+        # --override: force done
+        all_met, unmet = check_done_conditions(stage_id, root)
+
+        now = datetime.now(timezone.utc).isoformat()
+        overrides = state.setdefault("overrides", [])
+        overrides.append({
+            "stage": stage_id,
+            "timestamp": now,
+            "action": "confirm_override",
+            "reason": "用户使用 --override 强制确认",
+            "unmet_conditions": unmet,
+        })
+
+        set_stage_status(state, stage_id, "done", override=True)
+        save_state(state, root)
+
+        print(f"[WARN] 已使用 --override 强制确认阶段 '{stage_id}'。")
+        if unmet:
+            print(f"跳过的未满足条件: {', '.join(unmet)}")
+        print(f"override 已记录到 state.yaml。")
+        return 0
+
+
+# ---------------------------------------------------------------------------
 # CLI entry point
 # ---------------------------------------------------------------------------
 
@@ -332,6 +448,12 @@ def main():
     run_parser.add_argument("--override", action="store_true",
                             help="Skip dependency checks")
 
+    # confirm (v0.2 M5.2)
+    confirm_parser = subparsers.add_parser("confirm", help="Confirm a stage as done")
+    confirm_parser.add_argument("stage", help="Stage identifier")
+    confirm_parser.add_argument("--override", action="store_true",
+                                help="Force confirm and skip done_conditions check")
+
     args = parser.parse_args()
 
     project = getattr(args, "project", None)
@@ -342,6 +464,8 @@ def main():
         return cmd_resume(project=project)
     elif args.command == "run":
         return cmd_run(args.stage, override=args.override, project=project)
+    elif args.command == "confirm":
+        return cmd_confirm(args.stage, override=args.override, project=project)
     else:
         parser.print_help()
         return 1
