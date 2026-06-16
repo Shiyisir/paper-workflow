@@ -167,6 +167,10 @@ def create_directories(project_dir: Path) -> list[Path]:
         "manuscript",
         "literature",
         "citations",
+        "materials/requirements",
+        "materials/templates",
+        "materials/examples",
+        "materials/notes",
         "analysis/scripts",
         "analysis/tables",
         "analysis/figures",
@@ -312,6 +316,27 @@ def init_project(project_dir: Path, params: dict, force: bool = False) -> bool:
     # Create directories
     created = create_directories(project_dir)
     print(f"已创建 {len(created)} 个目录")
+
+    # Write materials/README.md
+    materials_readme = project_dir / "materials" / "README.md"
+    materials_readme.write_text(
+        "# 项目材料\n\n"
+        "此目录存放本论文项目的参考材料、格式要求和模板。\n\n"
+        "## 目录说明\n\n"
+        "| 子目录 | 用途 | 示例 |\n"
+        "|--------|------|------|\n"
+        "| `requirements/` | 论文要求、投稿指南、格式规范 | 课程要求、学校格式规定、期刊投稿指南 |\n"
+        "| `templates/` | Word/LaTeX 模板 | reference.docx、学校封面模板、LaTeX 模板 |\n"
+        "| `examples/` | 参考范文、往年样稿 | 已发表论文 PDF、学长论文 |\n"
+        "| `notes/` | 用户想法、导师要求、特殊说明 | 导师修改意见、图表风格偏好 |\n\n"
+        "## 注意事项\n\n"
+        "- `materials/` **不是**正式文献库，正式文献请放入 `literature/catalog.jsonl`\n"
+        "- 不参与 citation validation\n"
+        "- 不写入 references.bib\n"
+        "- `materials/templates/reference.docx` 可作为 formatting 阶段的**可选** Word 模板\n"
+        "- 没有 materials 文件时，所有阶段正常运行，不会 blocked\n",
+        encoding="utf-8"
+    )
 
     # Write state.yaml
     state_path = project_dir / ".paper-workflow" / "state.yaml"

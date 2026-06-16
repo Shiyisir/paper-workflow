@@ -117,7 +117,7 @@ def test_init_project_creates_files(tmp_paper_project):
 
     # Check directories exist
     for d in ["manuscript", "literature", "citations", "figures", "tables",
-              "outputs/latest", "outputs/qa", "analysis"]:
+              "outputs/latest", "outputs/qa", "analysis", "materials"]:
         assert (tmp_paper_project / d).is_dir(), f"Missing dir: {d}"
 
     # Check state.yaml content
@@ -161,6 +161,6 @@ def test_init_project_force_overwrites(tmp_paper_project):
 
 def test_create_directories(tmp_path):
     dirs = init_project.create_directories(tmp_path)
-    assert len(dirs) == 12
+    assert len(dirs) == 16
     for d in dirs:
         assert d.is_dir()
