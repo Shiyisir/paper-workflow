@@ -1,0 +1,122 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Stage Execution Contract",
+  "description": "Schema for each stage's execution contract. Defines how a stage should be executed, its inputs, outputs, and completion conditions.",
+  "type": "object",
+  "required": ["stage_id", "executor_type", "output_artifacts", "done_conditions"],
+  "properties": {
+    "stage_id": {
+      "type": "string",
+      "description": "17-stage identifier (e.g., 'literature_search', 'outline')"
+    },
+    "phase": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 6,
+      "description": "User-facing 6-phase workflow number"
+    },
+    "phase_label": {
+      "type": "string",
+      "description": "Human-readable phase name in Chinese"
+    },
+    "executor_type": {
+      "type": "string",
+      "enum": ["script", "skill_handoff", "manual", "hybrid"],
+      "description": "How this stage is executed"
+    },
+    "has_waiting_state": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether this stage enters waiting_for_user after initial execution"
+    },
+    "required_skill": {
+      "oneOf": [
+        {"type": "string"},
+        {"type": "null"},
+        {
+          "type": "object",
+          "additionalProperties": {"type": "string"},
+          "description": "Language-to-skill mapping (e.g., {zh: cnki-search, en: nature-academic-search})"
+        }
+      ],
+      "description": "Skill name for skill_handoff stages. Supports string, null, or language map."
+    },
+    "script_module": {
+      "type": ["string", "null"],
+      "description": "Python module name for script/hybrid stages"
+    },
+    "script_function": {
+      "type": ["string", "null"],
+      "description": "Python function name within script_module"
+    },
+    "followup_skill": {
+      "type": ["string", "null"],
+      "description": "Skill to handoff to if script check fails (hybrid stages only)"
+    },
+    "input_artifacts": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "Input file paths relative to project root. Prefix with 'optional:' for non-blocking inputs."
+    },
+    "output_artifacts": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "Expected output file paths relative to project root"
+    },
+    "preconditions": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "Conditions that must be met before stage starts"
+    },
+    "done_conditions": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "Conditions for stage completion (used by script, manual, hybrid stages)"
+    },
+    "handoff_done": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "Conditions for handoff generation completion (skill_handoff stages only). Stage enters waiting_for_user when these are met."
+    },
+    "stage_done": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "Conditions for actual stage completion after user/skill execution (skill_handoff stages only). Checked by 'confirm' command."
+    },
+    "quality_checks": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "Quality verification items to run after stage completion"
+    },
+    "user_confirmation_required": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether user must run 'confirm' before stage can be marked done"
+    },
+    "handoff_prompt_template": {
+      "type": ["string", "null"],
+      "description": "Template string for skill_handoff prompt. Variables in {curly_braces} are substituted at render time."
+    },
+    "fallback_on_failure": {
+      "type": "string",
+      "enum": ["block", "skip", "retry", "manual"],
+      "default": "block",
+      "description": "What to do when execution fails"
+    },
+    "not_in_v0.2_mvp": {
+      "type": "boolean",
+      "default": false,
+      "description": "Stage excluded from v0.2 MVP (treated as manual/future)"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {"executor_type": {"const": "skill_handoff"}}
+      },
+      "then": {
+        "required": ["handoff_done", "stage_done", "handoff_prompt_template"]
+      }
+    }
+  ]
+}
