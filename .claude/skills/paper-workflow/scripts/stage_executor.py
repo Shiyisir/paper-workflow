@@ -314,8 +314,8 @@ def _execute_script_stage(
     project_dir: Path,
     config: dict,
 ) -> dict:
-    """Execute a script-type stage. STUB in v0.2 — will be implemented in M3."""
-    return {
+    """Execute a script-type stage. Dispatches to real implementations in M3."""
+    base = {
         "executed": False,
         "stage_id": stage_id,
         "executor_type": "script",
@@ -323,9 +323,229 @@ def _execute_script_stage(
         "handoff_generated": False,
         "requires_confirmation": contract.get("user_confirmation_required", False),
         "artifacts": [],
-        "warnings": ["[v0.2 stub] script executor not yet implemented"],
+        "warnings": [],
         "blocked_reason": None,
     }
+
+    try:
+        if stage_id == "literature_dedup":
+            return _exec_literature_dedup(project_dir, base)
+        elif stage_id == "evidence_matrix":
+            return _exec_evidence_matrix(project_dir, contract, base)
+        elif stage_id == "formatting":
+            return _exec_formatting(project_dir, config, contract, base)
+        elif stage_id == "quality_qa":
+            return _exec_quality_qa(project_dir, base)
+        else:
+            base["warnings"].append(f"[v0.2 stub] script executor for '{stage_id}' not yet implemented")
+            return base
+    except Exception as e:
+        base["recommended_status"] = "blocked"
+        base["blocked_reason"] = f"{stage_id} executor error: {e}"
+        return base
+
+
+# ---------------------------------------------------------------------------
+# M3.1: literature_dedup executor
+# ---------------------------------------------------------------------------
+
+def _exec_literature_dedup(project_dir: Path, base: dict) -> dict:
+    """Execute literature_dedup: run dedup.py on catalog.jsonl."""
+    import json
+
+    catalog_path = project_dir / "literature" / "catalog.jsonl"
+    if not catalog_path.exists() or catalog_path.stat().st_size == 0:
+        base["recommended_status"] = "blocked"
+        base["blocked_reason"] = "catalog.jsonl is missing or empty"
+        return base
+
+    # Read records
+    records = []
+    with open(catalog_path, encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if line:
+                try:
+                    records.append(json.loads(line))
+                except json.JSONDecodeError:
+                    base["warnings"].append("skipped malformed line in catalog.jsonl")
+
+    if not records:
+        base["recommended_status"] = "blocked"
+        base["blocked_reason"] = "catalog.jsonl is empty"
+        return base
+
+    original_count = len(records)
+
+    # Run dedup
+    from dedup import deduplicate, _generate_report
+
+    result = deduplicate(records)
+    unique = result.get("unique", [])
+    merged = result.get("merged", [])
+    related = result.get("related", [])
+    pending = result.get("pending_review", [])
+
+    # Write dedup'd catalog
+    _write_catalog(catalog_path, unique)
+
+    # Generate report
+    report_path = project_dir / "literature" / "dedup-report.md"
+    report_text = _generate_report(result, original_count, len(unique))
+    report_path.write_text(report_text, encoding="utf-8")
+
+    log_artifacts(project_dir, "literature_dedup",
+                  ["literature/catalog.jsonl", "literature/dedup-report.md"],
+                  "dedup.py")
+
+    merged_count = len(merged)
+    related_count = len(related)
+    pending_count = len(pending)
+
+    base["executed"] = True
+    base["recommended_status"] = "done"
+    base["artifacts"] = ["literature/catalog.jsonl", "literature/dedup-report.md"]
+    base["warnings"] = []
+    if pending_count > 0:
+        base["warnings"].append(f"{pending_count} items pending manual review")
+    if related_count > 0:
+        base["warnings"].append(f"{related_count} related version pairs found")
+    if merged_count > 0:
+        base["warnings"].append(f"{merged_count} record groups merged")
+    return base
+
+
+def _write_catalog(path: Path, records: list[dict]) -> None:
+    """Overwrite catalog.jsonl with dedup'd records."""
+    import json as _json
+    import os as _os
+    import tempfile as _tempfile
+
+    tmp_fd, tmp_path = _tempfile.mkstemp(
+        suffix=".jsonl", prefix=".catalog-", dir=str(path.parent)
+    )
+    try:
+        with _os.fdopen(tmp_fd, "w", encoding="utf-8") as f:
+            for rec in records:
+                f.write(_json.dumps(rec, ensure_ascii=False) + "\n")
+        _os.replace(tmp_path, path)
+    except Exception:
+        if _os.path.exists(tmp_path):
+            _os.unlink(tmp_path)
+        raise
+
+
+# ---------------------------------------------------------------------------
+# M3.2: evidence_matrix executor
+# ---------------------------------------------------------------------------
+
+def _exec_evidence_matrix(project_dir: Path, contract: dict, base: dict) -> dict:
+    """Execute evidence_matrix: run evidence_manager.py and return pending_confirmation."""
+    from evidence_manager import init_evidence_matrix, init_claim_map
+
+    evidence_path = init_evidence_matrix(project_dir)
+    claim_path = init_claim_map(project_dir)
+
+    artifacts = []
+    if evidence_path.exists():
+        artifacts.append("literature/evidence-matrix.csv")
+    if claim_path.exists():
+        artifacts.append("citations/claim-citation-map.csv")
+
+    log_artifacts(project_dir, "evidence_matrix", artifacts, "evidence_manager.py")
+
+    user_conf = contract.get("user_confirmation_required", True)
+    base["executed"] = True
+    base["requires_confirmation"] = user_conf
+    base["recommended_status"] = "pending_confirmation" if user_conf else "done"
+    base["artifacts"] = artifacts
+    base["warnings"] = []
+    return base
+
+
+# ---------------------------------------------------------------------------
+# M3.3: formatting executor
+# ---------------------------------------------------------------------------
+
+def _exec_formatting(project_dir: Path, config: dict, contract: dict, base: dict) -> dict:
+    """Execute formatting: run render.py with appropriate profile."""
+    from render import render as render_func
+
+    manuscript = project_dir / "manuscript" / "main.md"
+    if not manuscript.exists():
+        base["recommended_status"] = "blocked"
+        base["blocked_reason"] = "manuscript/main.md not found"
+        return base
+
+    # Determine profile from config or default
+    profile = config.get("default_profile", "thesis-cn")
+
+    output_dir = project_dir / "outputs"
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Optional: materials/templates/reference.docx
+    ref_docx = project_dir / "materials" / "templates" / "reference.docx"
+    if ref_docx.exists():
+        base["warnings"].append("using materials/templates/reference.docx as optional template")
+    # Note: render.py currently reads reference-doc from profile config,
+    # not from materials/. This is a forward-compatible note.
+
+    result = render_func(profile, manuscript, output_dir, project_dir=project_dir)
+
+    if not result.get("success", False):
+        base["recommended_status"] = "blocked"
+        base["blocked_reason"] = "render failed: " + "; ".join(result.get("errors", ["unknown error"]))
+        base["warnings"] = result.get("warnings", [])
+        return base
+
+    # Check outputs/latest/
+    latest_dir = output_dir / "latest"
+    artifacts = []
+    if latest_dir.exists():
+        artifacts = [f"outputs/latest/{f.name}" for f in latest_dir.iterdir() if f.is_file()]
+
+    log_artifacts(project_dir, "formatting", artifacts, "render.py")
+
+    base["executed"] = True
+    base["recommended_status"] = "done"
+    base["artifacts"] = artifacts
+    base["warnings"] = result.get("warnings", [])
+    return base
+
+
+# ---------------------------------------------------------------------------
+# M3.4: quality_qa executor
+# ---------------------------------------------------------------------------
+
+def _exec_quality_qa(project_dir: Path, base: dict) -> dict:
+    """Execute quality_qa: run qa_report.py and determine pass/blocked."""
+    from qa_report import run_all_checks as qa_checks
+
+    results = qa_checks(project_dir)
+    errors = results.get("summary", {}).get("total_errors", 0)
+    warnings = results.get("summary", {}).get("total_warnings", 0)
+    overall = results.get("overall", "failed")
+
+    artifacts = []
+    qa_dir = project_dir / "outputs" / "qa"
+    if qa_dir.exists():
+        artifacts = [f"outputs/qa/{f.name}" for f in sorted(qa_dir.glob("qa-report-*.md"))]
+
+    log_artifacts(project_dir, "quality_qa", artifacts, "qa_report.py")
+
+    base["executed"] = True
+    if errors > 0:
+        base["recommended_status"] = "blocked"
+        base["blocked_reason"] = f"QA found {errors} errors, {warnings} warnings"
+        base["warnings"] = [f"QA overall: {overall}"]
+    elif warnings > 0:
+        base["recommended_status"] = "done"
+        base["warnings"] = [f"QA passed with {warnings} warnings (overall: {overall})"]
+    else:
+        base["recommended_status"] = "done"
+        base["warnings"] = [f"QA passed (overall: {overall})"]
+    base["artifacts"] = artifacts
+    return base
 
 
 def _execute_skill_handoff_stage(
