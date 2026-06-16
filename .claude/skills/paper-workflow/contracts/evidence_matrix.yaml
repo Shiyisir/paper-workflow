@@ -1,0 +1,22 @@
+stage_id: evidence_matrix
+phase: 2
+phase_label: 证据矩阵
+executor_type: script
+script_module: evidence_manager
+script_function: init_and_check
+input_artifacts:
+- literature/reading-notes/
+- literature/catalog.jsonl
+output_artifacts:
+- literature/evidence-matrix.csv
+- citations/claim-citation-map.csv
+preconditions:
+- file_exists:literature/reading-notes/
+done_conditions:
+- csv_has_rows:literature/evidence-matrix.csv
+- csv_has_rows:citations/claim-citation-map.csv
+quality_checks:
+- every evidence citekey exists in catalog.jsonl
+user_confirmation_required: true
+handoff_prompt_template: null
+fallback_on_failure: block

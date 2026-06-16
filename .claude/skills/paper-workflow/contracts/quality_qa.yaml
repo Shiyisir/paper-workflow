@@ -1,0 +1,27 @@
+stage_id: quality_qa
+phase: 6
+phase_label: 质量核验
+executor_type: script
+script_module: qa_report
+script_function: run_all_checks_and_report
+input_artifacts:
+- manuscript/main.md
+- literature/catalog.jsonl
+- literature/references.bib
+- outputs/
+- optional:materials/requirements/
+- optional:materials/templates/
+- optional:materials/examples/
+- optional:materials/notes/
+output_artifacts:
+- outputs/qa/qa-report-vNNN.md
+preconditions:
+- file_exists:outputs/latest/
+done_conditions:
+- file_exists:outputs/qa/qa-report-vNNN.md
+- qa_errors == 0
+quality_checks:
+- all checks have run
+user_confirmation_required: false
+handoff_prompt_template: null
+fallback_on_failure: block

@@ -1,0 +1,21 @@
+stage_id: literature_dedup
+phase: 1
+phase_label: 文献去重
+executor_type: script
+script_module: dedup
+script_function: deduplicate_and_report
+input_artifacts:
+- literature/catalog.jsonl
+output_artifacts:
+- literature/catalog.jsonl
+- literature/dedup-report.md
+preconditions:
+- file_exists:literature/catalog.jsonl
+- record_count:literature/catalog.jsonl > 0
+done_conditions:
+- file_exists:literature/dedup-report.md
+quality_checks:
+- no pending_review items remain
+user_confirmation_required: false
+handoff_prompt_template: null
+fallback_on_failure: block

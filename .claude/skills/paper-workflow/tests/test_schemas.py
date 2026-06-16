@@ -241,3 +241,27 @@ class TestStageExecutionContractSchema:
         del bad["executor_type"]
         with pytest.raises(jsonschema.ValidationError):
             jsonschema.validate(bad, schema)
+
+    def test_all_contract_files_pass_schema(self, schema):
+        """Every YAML file in contracts/ must validate against the schema."""
+        import yaml
+        contracts_dir = SCHEMA_DIR.parent / "contracts"
+        assert contracts_dir.is_dir(), "contracts/ directory not found"
+        count = 0
+        for cf in contracts_dir.glob("*.yaml"):
+            with open(cf, encoding="utf-8") as f:
+                contract = yaml.safe_load(f)
+            jsonschema.validate(contract, schema)
+            count += 1
+        assert count == 17, f"Expected 17 contracts, found {count}"
+
+    def test_contract_distribution(self, schema):
+        """Verify executor_type distribution: 4 script, 1 hybrid, 6 handoff, 6 manual."""
+        import yaml
+        contracts_dir = SCHEMA_DIR.parent / "contracts"
+        dist = {"script": 0, "hybrid": 0, "skill_handoff": 0, "manual": 0}
+        for cf in contracts_dir.glob("*.yaml"):
+            with open(cf, encoding="utf-8") as f:
+                c = yaml.safe_load(f)
+            dist[c["executor_type"]] += 1
+        assert dist == {"script": 4, "hybrid": 1, "skill_handoff": 6, "manual": 6}, f"Wrong distribution: {dist}"

@@ -1,0 +1,21 @@
+stage_id: formatting
+phase: 6
+phase_label: 格式渲染
+executor_type: script
+script_module: render
+script_function: render
+input_artifacts:
+- manuscript/main.md
+- literature/references.bib
+- optional:materials/templates/reference.docx
+output_artifacts:
+- outputs/*-vNNN.*
+- outputs/latest/
+preconditions:
+- file_exists:manuscript/main.md
+done_conditions:
+- file_exists:outputs/latest/
+quality_checks: []
+user_confirmation_required: false
+handoff_prompt_template: null
+fallback_on_failure: block

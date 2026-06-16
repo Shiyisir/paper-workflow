@@ -1,0 +1,43 @@
+stage_id: writing
+phase: 4
+phase_label: 论文撰写
+executor_type: skill_handoff
+has_waiting_state: true
+required_skill: nature-writing
+input_artifacts:
+- manuscript/outline.md
+- literature/evidence-matrix.csv
+- citations/claim-citation-map.csv
+- literature/reading-notes/
+- optional:materials/requirements/
+- optional:materials/templates/
+- optional:materials/examples/
+- optional:materials/notes/
+output_artifacts:
+- manuscript/main.md
+preconditions:
+- file_exists:manuscript/outline.md
+done_conditions: []
+handoff_done:
+- file_exists:.paper-workflow/handoffs/writing.json
+stage_done:
+- file_exists:manuscript/main.md
+- no_unresolved_cite_needed:manuscript/main.md
+quality_checks:
+- validate_manuscript structure check passes
+- all cited citekeys exist in catalog
+user_confirmation_required: true
+handoff_prompt_template: '请使用 nature-writing 的章节模式，基于以下材料撰写论文。
+
+  论文类型：{paper_type}  大纲：manuscript/outline.md
+
+  证据矩阵：literature/evidence-matrix.csv
+
+  阅读笔记：literature/reading-notes/
+
+  可用项目材料：
+
+  {materials_summary}
+
+  请逐章撰写，用 [@citekey] 格式标注引用。输出到 manuscript/main.md。'
+fallback_on_failure: manual

@@ -1,0 +1,15 @@
+stage_id: research_design
+phase: 4
+phase_label: 研究设计
+executor_type: manual
+input_artifacts:
+- literature/evidence-matrix.csv
+output_artifacts:
+- analysis/experiment-plan.md
+preconditions: []
+done_conditions:
+- file_exists:analysis/experiment-plan.md
+quality_checks: []
+user_confirmation_required: true
+handoff_prompt_template: null
+fallback_on_failure: manual

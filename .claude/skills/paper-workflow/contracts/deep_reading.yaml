@@ -1,0 +1,32 @@
+stage_id: deep_reading
+phase: 2
+phase_label: 深度阅读
+executor_type: skill_handoff
+has_waiting_state: true
+required_skill: nature-reader
+input_artifacts:
+- literature/catalog.jsonl
+- literature/pdfs/
+output_artifacts:
+- literature/reading-notes/{citekey}.md
+preconditions:
+- record_count:literature/catalog.jsonl > 0
+done_conditions: []
+handoff_done:
+- file_exists:.paper-workflow/handoffs/deep_reading.json
+stage_done:
+- file_exists:literature/reading-notes/
+quality_checks:
+- reading note filenames match catalog citekeys
+- reading notes are non-empty
+user_confirmation_required: true
+handoff_prompt_template: '请使用 nature-reader 精读以下论文的 PDF。
+
+  论文：{papers_list}
+
+  重点关注：{focus_areas}
+
+  请生成完整的双语阅读笔记，保留图表位置。
+
+  输出到：literature/reading-notes/{{citekey}}.md'
+fallback_on_failure: manual
