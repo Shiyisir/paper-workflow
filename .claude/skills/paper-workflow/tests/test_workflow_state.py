@@ -262,6 +262,20 @@ class TestSetStageStatus:
         assert result["success"] is False
         assert "无效状态" in result["message"]
 
+    def test_waiting_for_user_is_valid(self):
+        """waiting_for_user is a valid v0.2 status."""
+        state = _build_state_with_deps()
+        result = ws.set_stage_status(state, "literature_search", "waiting_for_user", override=True)
+        assert result["success"] is True
+        assert state["stages"]["literature_search"]["status"] == "waiting_for_user"
+
+    def test_pending_confirmation_is_valid(self):
+        """pending_confirmation is a valid v0.2 status."""
+        state = _build_state_with_deps()
+        result = ws.set_stage_status(state, "evidence_matrix", "pending_confirmation", override=True)
+        assert result["success"] is True
+        assert state["stages"]["evidence_matrix"]["status"] == "pending_confirmation"
+
     def test_done_clears_blockers(self):
         """When a blocked stage is later completed (after deps met), blockers clear."""
         state = _build_state_with_deps()

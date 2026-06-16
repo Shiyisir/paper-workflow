@@ -46,7 +46,7 @@
           "properties": {
             "status": {
               "type": "string",
-              "enum": ["pending", "in_progress", "done", "skipped", "blocked"]
+              "enum": ["pending", "in_progress", "waiting_for_user", "pending_confirmation", "done", "skipped", "blocked"]
             },
             "depends_on": {
               "type": "array",
