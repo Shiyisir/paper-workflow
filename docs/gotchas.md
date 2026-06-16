@@ -45,6 +45,9 @@
 
 - [2026-06-15] **Windows GBK 终端 Unicode 崩溃**：print(\"✓\") 在 Windows Git Bash 中抛出 UnicodeEncodeError → scripts 中 print 只使用 ASCII（用 [OK]/[FAIL]/[WARN] 替代 Unicode 符号）。Markdown 报告文件（utf-8 写入）不受影响。
 - [2026-06-15] **render.py 相对路径陷阱**：--input manuscript/main.md 相对于 cwd 而非 --project → 在 CLI 入口用 project_dir / args.input 解析。
+- [2026-06-16] **内部 API 参数名不一致**：literature_store.py / search_logger.py 使用 `project_root`，但 evidence_manager.py / export_references.py / render.py 使用 `project_dir` → 全部统一为 `project_dir`，旧参数名保留为 deprecated alias。
+- [2026-06-16] **commands.py 不支持 --project**：status / resume / run 要求用户 cd 到项目目录，但 render.py 和 qa_report.py 支持 --project → 所有 CLI 脚本统一支持 --project 参数，未传时自动向上查找 .paper-workflow/。
+- [2026-06-16] **export_references.py 缺少友好的 --project 缺失提示**：未传 --project 且不在项目目录内时直接报 AttributeError → 所有 CLI 入口统一使用 _find_project_root() 自动发现，找不到时输出 "[ERROR] 未找到 .paper-workflow/ 目录"。
 
 ---
 

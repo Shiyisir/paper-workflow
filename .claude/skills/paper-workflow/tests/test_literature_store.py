@@ -90,7 +90,7 @@ class TestCatalogCRUD:
     def test_append_and_read(self, tmp_path):
         root = self._setup_project(tmp_path)
         records = [self._make_record(), self._make_record()]
-        count = ls.append_records(records, project_root=root)
+        count = ls.append_records(records, project_dir=root)
         assert count == 2
 
         read_back = ls.read_catalog(root)
@@ -99,14 +99,14 @@ class TestCatalogCRUD:
     def test_auto_generates_canonical_id(self, tmp_path):
         root = self._setup_project(tmp_path)
         record = self._make_record(cid=None)  # No canonical_id
-        ls.append_records([record], project_root=root)
+        ls.append_records([record], project_dir=root)
         read_back = ls.read_catalog(root)
         assert read_back[0]["canonical_id"] == "ref-0001"
 
     def test_auto_generates_citekey(self, tmp_path):
         root = self._setup_project(tmp_path)
         record = self._make_record(cid=None, citekey=None, title_override="Deep learning for NLP")
-        ls.append_records([record], project_root=root)
+        ls.append_records([record], project_dir=root)
         read_back = ls.read_catalog(root)
         assert read_back[0]["citekey"] == "test2024DeepLearning"
 
@@ -114,7 +114,7 @@ class TestCatalogCRUD:
         root = self._setup_project(tmp_path)
         for i in range(3):
             record = self._make_record(cid=None, title_override=f"Paper {i}")
-            ls.append_records([record], project_root=root)
+            ls.append_records([record], project_dir=root)
         read_back = ls.read_catalog(root)
         ids = [r["canonical_id"] for r in read_back]
         assert ids == ["ref-0001", "ref-0002", "ref-0003"]
@@ -123,7 +123,7 @@ class TestCatalogCRUD:
         root = self._setup_project(tmp_path)
         r1 = self._make_record(cid=None, citekey=None)
         r1["doi"] = "10.1016/j.ecoser.2024.101650"
-        ls.append_records([r1], project_root=root)
+        ls.append_records([r1], project_dir=root)
 
         results = ls.get_by_doi("10.1016/j.ecoser.2024.101650", root)
         assert len(results) == 1
@@ -132,7 +132,7 @@ class TestCatalogCRUD:
         root = self._setup_project(tmp_path)
         r1 = self._make_record(cid=None, citekey=None)
         r1["doi"] = "10.1016/J.ECOSER.2024.101650"
-        ls.append_records([r1], project_root=root)
+        ls.append_records([r1], project_dir=root)
 
         results = ls.get_by_doi("10.1016/j.ecoser.2024.101650", root)
         assert len(results) == 1
@@ -140,7 +140,7 @@ class TestCatalogCRUD:
     def test_citekey_lookup(self, tmp_path):
         root = self._setup_project(tmp_path)
         r1 = self._make_record(cid="ref-0001", citekey="test2024Deep")
-        ls.append_records([r1], project_root=root, auto_id=False, auto_citekey=False)
+        ls.append_records([r1], project_dir=root, auto_id=False, auto_citekey=False)
 
         result = ls.get_by_citekey("test2024Deep", root)
         assert result is not None
@@ -150,14 +150,14 @@ class TestCatalogCRUD:
         root = self._setup_project(tmp_path)
         bad = {"canonical_id": "bad-format"}  # Missing required fields
         with pytest.raises(jsonschema.ValidationError):
-            ls.append_records([bad], project_root=root, auto_id=False, auto_citekey=False)
+            ls.append_records([bad], project_dir=root, auto_id=False, auto_citekey=False)
 
     def test_citekey_conflict_auto_resolved(self, tmp_path):
         root = self._setup_project(tmp_path)
         # Two records with same author/year/title → same citekey
         r1 = self._make_record(cid=None, citekey=None, title_override="Deep learning")
         r2 = self._make_record(cid=None, citekey=None, title_override="Deep learning")
-        ls.append_records([r1, r2], project_root=root)
+        ls.append_records([r1, r2], project_dir=root)
 
         read_back = ls.read_catalog(root)
         keys = [r["citekey"] for r in read_back]
@@ -167,7 +167,7 @@ class TestCatalogCRUD:
     def test_update_record(self, tmp_path):
         root = self._setup_project(tmp_path)
         r1 = self._make_record(cid="ref-0001", citekey="test2024Paper")
-        ls.append_records([r1], project_root=root, auto_id=False, auto_citekey=False)
+        ls.append_records([r1], project_dir=root, auto_id=False, auto_citekey=False)
 
         updated = ls.update_record("ref-0001", {"screening_status": "included"}, root)
         assert updated is True
@@ -188,5 +188,5 @@ class TestCatalogCRUD:
     def test_count_records(self, tmp_path):
         root = self._setup_project(tmp_path)
         for _ in range(3):
-            ls.append_records([self._make_record()], project_root=root)
+            ls.append_records([self._make_record()], project_dir=root)
         assert ls.count_records(root) == 3

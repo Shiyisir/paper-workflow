@@ -25,7 +25,7 @@ def _load_schema() -> dict:
     return _schema_cache
 
 
-def _find_project_root() -> Path:
+def _find_project_dir() -> Path:
     """Find project root by walking up for .paper-workflow/."""
     current = Path.cwd().resolve()
     for _ in range(10):
@@ -40,8 +40,8 @@ def _find_project_root() -> Path:
     )
 
 
-def get_catalog_path(project_root: Path | None = None) -> Path:
-    root = project_root or _find_project_root()
+def get_catalog_path(project_dir: Path | None = None) -> Path:
+    root = project_dir or _find_project_dir()
     return root / "literature" / "catalog.jsonl"
 
 
@@ -137,9 +137,9 @@ def resolve_citekey_conflict(
 # CRUD operations
 # ---------------------------------------------------------------------------
 
-def read_catalog(project_root: Path | None = None) -> list[dict]:
+def read_catalog(project_dir: Path | None = None) -> list[dict]:
     """Read all records from catalog.jsonl. Returns empty list if file missing."""
-    path = get_catalog_path(project_root)
+    path = get_catalog_path(project_dir)
     if not path.exists():
         return []
     records = []
@@ -185,7 +185,7 @@ def validate_record(record: dict) -> list[str]:
 
 def append_records(
     records: list[dict],
-    project_root: Path | None = None,
+    project_dir: Path | None = None,
     auto_id: bool = True,
     auto_citekey: bool = True,
 ) -> int:
@@ -193,7 +193,7 @@ def append_records(
 
     Args:
         records: List of literature record dicts.
-        project_root: Paper project root (auto-detected if None).
+        project_dir: Paper project root (auto-detected if None).
         auto_id: If True, generate canonical_id for records missing it.
         auto_citekey: If True, generate citekey for records missing it.
 
@@ -203,10 +203,10 @@ def append_records(
     Raises:
         jsonschema.ValidationError: If any record fails schema validation.
     """
-    path = get_catalog_path(project_root)
+    path = get_catalog_path(project_dir)
     path.parent.mkdir(parents=True, exist_ok=True)
 
-    existing = read_catalog(project_root)
+    existing = read_catalog(project_dir)
     existing_ids, existing_keys = _get_existing_ids_and_keys(existing)
 
     appended = 0
@@ -245,51 +245,51 @@ def append_records(
 def update_record(
     canonical_id: str,
     updates: dict,
-    project_root: Path | None = None,
+    project_dir: Path | None = None,
 ) -> bool:
     """Update a single record by canonical_id in place.
 
     Returns True if the record was found and updated.
     """
-    records = read_catalog(project_root)
+    records = read_catalog(project_dir)
     for i, r in enumerate(records):
         if r.get("canonical_id") == canonical_id:
             records[i] = {**r, **updates}
-            _write_full_catalog(records, project_root)
+            _write_full_catalog(records, project_dir)
             return True
     return False
 
 
-def get_by_doi(doi: str, project_root: Path | None = None) -> list[dict]:
+def get_by_doi(doi: str, project_dir: Path | None = None) -> list[dict]:
     """Find records by DOI (case-insensitive substring match)."""
     doi_lower = doi.strip().lower()
     if not doi_lower:
         return []
-    records = read_catalog(project_root)
+    records = read_catalog(project_dir)
     return [r for r in records if r.get("doi") and doi_lower in r["doi"].lower()]
 
 
-def get_by_citekey(citekey: str, project_root: Path | None = None) -> dict | None:
+def get_by_citekey(citekey: str, project_dir: Path | None = None) -> dict | None:
     """Find a record by exact citekey match."""
-    records = read_catalog(project_root)
+    records = read_catalog(project_dir)
     for r in records:
         if r.get("citekey") == citekey:
             return r
     return None
 
 
-def count_records(project_root: Path | None = None) -> int:
+def count_records(project_dir: Path | None = None) -> int:
     """Return the total number of records in catalog.jsonl."""
-    return len(read_catalog(project_root))
+    return len(read_catalog(project_dir))
 
 
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
 
-def _write_full_catalog(records: list[dict], project_root: Path | None = None) -> None:
+def _write_full_catalog(records: list[dict], project_dir: Path | None = None) -> None:
     """Overwrite the entire catalog.jsonl (used by update_record)."""
-    path = get_catalog_path(project_root)
+    path = get_catalog_path(project_dir)
     # Atomic write: temp file + replace
     import os
     import tempfile

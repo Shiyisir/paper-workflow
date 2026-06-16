@@ -314,7 +314,12 @@ def main():
                         help="Only check citekey sync between existing files")
     args = parser.parse_args()
 
-    project_dir = Path(args.project) if args.project else _find_project_root()
+    try:
+        project_dir = Path(args.project) if args.project else _find_project_root()
+    except FileNotFoundError as e:
+        print(f"[ERROR] {e}")
+        print("提示：请传 --project <项目目录> 或在论文项目目录下运行。")
+        return 1
 
     if args.sync:
         bib = project_dir / "literature" / "references.bib"

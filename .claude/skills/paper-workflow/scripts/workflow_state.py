@@ -52,9 +52,9 @@ def find_project_root(start: Path | None = None) -> Path | None:
     return None
 
 
-def get_pw_dir(project_root: Path | None = None) -> Path:
+def get_pw_dir(project_dir: Path | None = None) -> Path:
     """Get the .paper-workflow directory path."""
-    root = project_root or find_project_root()
+    root = project_dir or find_project_root()
     if root is None:
         raise FileNotFoundError(
             "找不到 .paper-workflow/ 目录。请在论文项目根目录下运行，"
@@ -115,7 +115,7 @@ def init_state(project_id: str, config: dict) -> dict:
     return state
 
 
-def load_state(project_root: Path | None = None) -> dict:
+def load_state(project_dir: Path | None = None) -> dict:
     """Load state.yaml and merge with config.yaml.
 
     Returns a dict with keys: 'state' (state.yaml content) and
@@ -123,7 +123,7 @@ def load_state(project_root: Path | None = None) -> dict:
 
     Raises FileNotFoundError if neither file exists.
     """
-    pw_dir = get_pw_dir(project_root)
+    pw_dir = get_pw_dir(project_dir)
 
     state_path = pw_dir / "state.yaml"
     config_path = pw_dir / "config.yaml"
@@ -148,13 +148,13 @@ def load_state(project_root: Path | None = None) -> dict:
     return {"state": state, "config": config}
 
 
-def save_state(state: dict, project_root: Path | None = None) -> Path:
+def save_state(state: dict, project_dir: Path | None = None) -> Path:
     """Atomically write state dict to state.yaml.
 
     Uses temp file + rename to avoid corrupting the state file on write failure.
     Returns the path to the written file.
     """
-    pw_dir = get_pw_dir(project_root)
+    pw_dir = get_pw_dir(project_dir)
     state_path = pw_dir / "state.yaml"
 
     # Atomic write: write to temp file in same directory, then rename

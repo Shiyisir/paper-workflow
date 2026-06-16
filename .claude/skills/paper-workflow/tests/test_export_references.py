@@ -17,7 +17,7 @@ def _setup_catalog(root: Path, records: list[dict]) -> Path:
     from literature_store import append_records
     (root / "literature").mkdir(parents=True, exist_ok=True)
     (root / ".paper-workflow").mkdir(parents=True, exist_ok=True)
-    append_records(records, project_root=root)
+    append_records(records, project_dir=root)
     return root / "literature" / "catalog.jsonl"
 
 
@@ -186,3 +186,39 @@ class TestDuplicateCitekeys:
         )
         dupes = er.find_duplicate_citekeys(bib_path)
         assert "key1" in dupes
+
+
+class TestCLIPathResolution:
+    """Test export_references CLI project directory resolution."""
+
+    _make_record = staticmethod(_make_record)
+
+    def test_project_flag_from_outside(self, tmp_path):
+        """--project flag works from outside project directory."""
+        root = tmp_path / "project"
+        records = [self._make_record("ref-0001", "a2024X", "Paper A", ["Test, A."], 2024)]
+        _setup_catalog(root, records)
+        outside = tmp_path / "outside"
+        outside.mkdir()
+        import os
+        old_cwd = os.getcwd()
+        try:
+            os.chdir(str(outside))
+            count = er.export_bib(root)
+            assert count == 1
+            assert (root / "literature" / "references.bib").exists()
+        finally:
+            os.chdir(old_cwd)
+
+    def test_no_project_and_no_flag_gives_error(self, tmp_path):
+        """Outside project without --project should raise clear error."""
+        empty = tmp_path / "empty"
+        empty.mkdir()
+        import os
+        old_cwd = os.getcwd()
+        try:
+            os.chdir(str(empty))
+            with pytest.raises(FileNotFoundError):
+                er._find_project_root()
+        finally:
+            os.chdir(old_cwd)

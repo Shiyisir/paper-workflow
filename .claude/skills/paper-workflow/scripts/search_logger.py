@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 
-def _find_project_root() -> Path:
+def _find_project_dir() -> Path:
     """Find project root by walking up for .paper-workflow/."""
     current = Path.cwd().resolve()
     for _ in range(10):
@@ -24,8 +24,8 @@ def _find_project_root() -> Path:
     )
 
 
-def get_search_log_path(project_root: Path | None = None) -> Path:
-    root = project_root or _find_project_root()
+def get_search_log_path(project_dir: Path | None = None) -> Path:
+    root = project_dir or _find_project_dir()
     return root / ".paper-workflow" / "search-log.jsonl"
 
 
@@ -36,7 +36,7 @@ def log_search(
     filters: dict | None = None,
     search_mode: str = "standard",
     notes: str = "",
-    project_root: Path | None = None,
+    project_dir: Path | None = None,
 ) -> dict:
     """Append a search record to search-log.jsonl.
 
@@ -47,12 +47,12 @@ def log_search(
         filters: Applied filters (year range, language, etc.).
         search_mode: quick, standard, or systematic.
         notes: Free-text notes about the search.
-        project_root: Paper project root (auto-detected).
+        project_dir: Paper project root (auto-detected).
 
     Returns:
         The logged entry dict.
     """
-    path = get_search_log_path(project_root)
+    path = get_search_log_path(project_dir)
     path.parent.mkdir(parents=True, exist_ok=True)
 
     entry = {
@@ -71,9 +71,9 @@ def log_search(
     return entry
 
 
-def get_search_history(project_root: Path | None = None) -> list[dict]:
+def get_search_history(project_dir: Path | None = None) -> list[dict]:
     """Read all search log entries."""
-    path = get_search_log_path(project_root)
+    path = get_search_log_path(project_dir)
     if not path.exists():
         return []
     entries = []
@@ -89,6 +89,6 @@ def get_search_history(project_root: Path | None = None) -> list[dict]:
     return entries
 
 
-def get_search_count(project_root: Path | None = None) -> int:
+def get_search_count(project_dir: Path | None = None) -> int:
     """Return total number of search sessions."""
-    return len(get_search_history(project_root))
+    return len(get_search_history(project_dir))

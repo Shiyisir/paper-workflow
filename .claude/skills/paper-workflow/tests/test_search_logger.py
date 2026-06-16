@@ -23,7 +23,7 @@ class TestSearchLogger:
             source="scopus",
             count=42,
             filters={"year": "2020-2024"},
-            project_root=root,
+            project_dir=root,
         )
         assert entry["query"] == "rocky desertification"
         assert entry["source"] == "scopus"
@@ -32,8 +32,8 @@ class TestSearchLogger:
 
     def test_get_search_history(self, tmp_path):
         root = self._setup_project(tmp_path)
-        sl.log_search("query 1", "cnki", project_root=root)
-        sl.log_search("query 2", "pubmed", project_root=root)
+        sl.log_search("query 1", "cnki", project_dir=root)
+        sl.log_search("query 2", "pubmed", project_dir=root)
 
         history = sl.get_search_history(root)
         assert len(history) == 2
@@ -43,7 +43,7 @@ class TestSearchLogger:
     def test_get_search_count(self, tmp_path):
         root = self._setup_project(tmp_path)
         assert sl.get_search_count(root) == 0
-        sl.log_search("test", "crossref", project_root=root)
+        sl.log_search("test", "crossref", project_dir=root)
         assert sl.get_search_count(root) == 1
 
     def test_empty_history(self, tmp_path):
@@ -53,7 +53,7 @@ class TestSearchLogger:
 
     def test_file_is_created(self, tmp_path):
         root = self._setup_project(tmp_path)
-        sl.log_search("test", "arxiv", project_root=root)
+        sl.log_search("test", "arxiv", project_dir=root)
         log_path = root / ".paper-workflow" / "search-log.jsonl"
         assert log_path.exists()
 
@@ -64,7 +64,7 @@ class TestSearchLogger:
             source="crossref",
             search_mode="standard",
             notes="Round 1: core keyword search",
-            project_root=root,
+            project_dir=root,
         )
         assert entry["search_mode"] == "standard"
         assert "Round 1" in entry["notes"]

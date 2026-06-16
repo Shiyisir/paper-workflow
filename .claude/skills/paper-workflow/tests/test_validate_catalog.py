@@ -46,7 +46,7 @@ class TestValidateCatalog:
             _make_record("ref-0001", "test2024A", "Paper A"),
             _make_record("ref-0002", "test2024B", "Paper B"),
         ]
-        append_records(records, project_root=root, auto_id=False, auto_citekey=False)
+        append_records(records, project_dir=root, auto_id=False, auto_citekey=False)
         result = vcat.validate_catalog(root)
         assert result["errors"] == []
 
@@ -56,7 +56,7 @@ class TestValidateCatalog:
             _make_record("ref-0001", "test2024A", "Paper A"),
             _make_record("ref-0001", "test2024B", "Paper B"),  # same id
         ]
-        append_records(records, project_root=root, auto_id=False, auto_citekey=False)
+        append_records(records, project_dir=root, auto_id=False, auto_citekey=False)
         result = vcat.validate_catalog(root)
         assert any("ref-0001" in e for e in result["errors"])
 
@@ -66,21 +66,21 @@ class TestValidateCatalog:
             _make_record("ref-0001", "test2024A", "Paper A"),
             _make_record("ref-0002", "test2024A", "Paper B"),  # same citekey
         ]
-        append_records(records, project_root=root, auto_id=False, auto_citekey=False)
+        append_records(records, project_dir=root, auto_id=False, auto_citekey=False)
         result = vcat.validate_catalog(root)
         assert any("test2024A" in e for e in result["errors"])
 
     def test_missing_doi_is_warning(self, tmp_path):
         root = _setup_project(tmp_path)
         records = [_make_record("ref-0001", "test2024", "Paper", doi=None)]
-        append_records(records, project_root=root, auto_id=False, auto_citekey=False)
+        append_records(records, project_dir=root, auto_id=False, auto_citekey=False)
         result = vcat.validate_catalog(root)
         assert any("DOI" in w for w in result["warnings"])
 
     def test_bad_doi_format_is_warning(self, tmp_path):
         root = _setup_project(tmp_path)
         records = [_make_record("ref-0001", "test2024", "Paper", doi="not-a-doi")]
-        append_records(records, project_root=root, auto_id=False, auto_citekey=False)
+        append_records(records, project_dir=root, auto_id=False, auto_citekey=False)
         result = vcat.validate_catalog(root)
         assert any("DOI 格式" in w for w in result["warnings"])
 
@@ -98,7 +98,7 @@ class TestValidateCatalog:
     def test_bib_not_synced(self, tmp_path):
         root = _setup_project(tmp_path)
         records = [_make_record("ref-0001", "test2024A", "Paper A")]
-        append_records(records, project_root=root, auto_id=False, auto_citekey=False)
+        append_records(records, project_dir=root, auto_id=False, auto_citekey=False)
         # Create a bib with different citekeys
         (root / "literature" / "references.bib").write_text(
             "@article{differentKey,\n  title = {X},\n}\n", encoding="utf-8"
@@ -119,7 +119,7 @@ class TestValidateCatalog:
             _make_record("ref-0001", "dup", "Paper A"),
             _make_record("ref-0002", "dup", "Paper B"),  # duplicate citekey
         ]
-        append_records(records, project_root=root, auto_id=False, auto_citekey=False)
+        append_records(records, project_dir=root, auto_id=False, auto_citekey=False)
         result = vcat.validate_catalog(root)
         assert "errors" in result
         assert "warnings" in result

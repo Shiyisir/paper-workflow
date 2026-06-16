@@ -213,3 +213,65 @@ class TestEndToEndMinimal:
         commands.cmd_status()
         captured = capsys.readouterr()
         assert "writing (done)" in captured.out
+
+
+class TestProjectFlag:
+    """Test --project flag across all commands."""
+
+    def test_status_with_project_flag(self, tmp_path, monkeypatch, capsys):
+        """status --project <path> works from outside project directory."""
+        project = _setup_project(tmp_path)
+        empty = tmp_path / "empty"
+        empty.mkdir()
+        monkeypatch.chdir(empty)
+        rc = commands.cmd_status(project=str(project))
+        assert rc == 0
+        captured = capsys.readouterr()
+        assert "test-001" in captured.out
+
+    def test_status_with_project_flag_rejects_bad_path(self, tmp_path, monkeypatch):
+        """--project with invalid path returns non-zero."""
+        empty = tmp_path / "empty"
+        empty.mkdir()
+        monkeypatch.chdir(empty)
+        rc = commands.cmd_status(project=str(empty))
+        assert rc != 0
+
+    def test_resume_with_project_flag(self, tmp_path, monkeypatch, capsys):
+        """resume --project <path> works from outside project directory."""
+        project = _setup_project(tmp_path)
+        empty = tmp_path / "empty"
+        empty.mkdir()
+        monkeypatch.chdir(empty)
+        rc = commands.cmd_resume(project=str(project))
+        assert rc == 0
+        captured = capsys.readouterr()
+        assert "requirements" in captured.out
+
+    def test_run_with_project_flag(self, tmp_path, monkeypatch):
+        """run --project <path> works from outside project directory."""
+        project = _setup_project(tmp_path)
+        empty = tmp_path / "empty"
+        empty.mkdir()
+        monkeypatch.chdir(empty)
+        rc = commands.cmd_run("requirements", project=str(project))
+        assert rc == 0
+
+    def test_auto_discovery_from_subdir(self, tmp_path, monkeypatch, capsys):
+        """status auto-discovers project from subdirectory."""
+        project = _setup_project(tmp_path)
+        subdir = project / "manuscript"
+        subdir.mkdir()
+        monkeypatch.chdir(subdir)
+        rc = commands.cmd_status()
+        assert rc == 0
+        captured = capsys.readouterr()
+        assert "test-001" in captured.out
+
+    def test_auto_discovery_fails_outside_project(self, tmp_path, monkeypatch):
+        """status fails gracefully when no project found."""
+        empty = tmp_path / "no-project"
+        empty.mkdir(parents=True)
+        monkeypatch.chdir(empty)
+        rc = commands.cmd_status()
+        assert rc != 0

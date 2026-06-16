@@ -8,6 +8,38 @@
 - `disable-model-invocation: true`：不会被自然语言自动触发
 - 单次任务（如"搜知网""润色摘要"）由对应叶子 skill 自行触发
 
+## 常用命令
+
+所有命令支持 `--project` / `-p` 指定项目目录。未传时从当前目录向上查找 `.paper-workflow/` 自动发现。
+
+```bash
+# 项目初始化
+python scripts/init_project.py <project_dir> --slug my-paper --paper-type course_paper --language zh
+
+# 查看状态
+python scripts/commands.py --project /path/to/project status [--verbose]
+python scripts/commands.py status                         # 自动发现（需在项目目录内）
+
+# 恢复中断
+python scripts/commands.py --project /path/to/project resume
+
+# 推进阶段
+python scripts/commands.py --project /path/to/project run writing
+python scripts/commands.py --project /path/to/project run literature_dedup --override
+
+# 导出参考文献
+python scripts/export_references.py --project /path/to/project --format both
+
+# 渲染输出
+python scripts/render.py --project /path/to/project --profile thesis-cn --input manuscript/main.md --output outputs/
+
+# QA 核验
+python scripts/qa_report.py --project /path/to/project
+
+# 文献库校验
+python scripts/validate_catalog.py --project /path/to/project
+```
+
 ## 叶子 skill
 
 | 能力 | 技能 |
@@ -52,4 +84,4 @@
 pytest .claude/skills/paper-workflow/tests/ -v
 ```
 
-当前 288 个测试覆盖 M0–M7 所有脚本。
+当前测试覆盖 M0–M7 所有脚本。

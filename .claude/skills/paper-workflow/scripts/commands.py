@@ -30,6 +30,21 @@ from workflow_state import (
 
 
 # ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _resolve_project_dir(explicit: str | None = None) -> Path | None:
+    """Resolve project directory from explicit --project, cwd, or upward search."""
+    if explicit:
+        proj = Path(explicit).resolve()
+        if (proj / ".paper-workflow").is_dir():
+            return proj
+        print(f"错误：'{explicit}' 不是有效的 paper-workflow 项目目录（缺少 .paper-workflow/）。")
+        return None
+    return find_project_root()
+
+
+# ---------------------------------------------------------------------------
 # Stage executors (stubs — will be filled in M3–M7)
 # ---------------------------------------------------------------------------
 
@@ -48,12 +63,12 @@ def _execute_stage(stage_id: str) -> dict:
 # Status command
 # ---------------------------------------------------------------------------
 
-def cmd_status(verbose: bool = False) -> int:
+def cmd_status(verbose: bool = False, project: str | None = None) -> int:
     """Display project status."""
-    root = find_project_root()
+    root = _resolve_project_dir(project)
     if root is None:
         print("错误：未找到 paper-workflow 项目。")
-        print("请运行 /paper-workflow init 初始化项目，或在项目目录下执行此命令。")
+        print("请运行 /paper-workflow init 初始化项目，或传 --project 指定项目目录。")
         return 1
 
     try:
@@ -146,11 +161,12 @@ def cmd_status(verbose: bool = False) -> int:
 # Resume command
 # ---------------------------------------------------------------------------
 
-def cmd_resume() -> int:
+def cmd_resume(project: str | None = None) -> int:
     """Resume from current stage."""
-    root = find_project_root()
+    root = _resolve_project_dir(project)
     if root is None:
         print("错误：未找到 paper-workflow 项目。")
+        print("请运行 /paper-workflow init 初始化项目，或传 --project 指定项目目录。")
         return 1
 
     try:
@@ -217,11 +233,12 @@ def cmd_resume() -> int:
 # Run command
 # ---------------------------------------------------------------------------
 
-def cmd_run(stage_id: str, override: bool = False) -> int:
+def cmd_run(stage_id: str, override: bool = False, project: str | None = None) -> int:
     """Run a specific stage."""
-    root = find_project_root()
+    root = _resolve_project_dir(project)
     if root is None:
         print("错误：未找到 paper-workflow 项目。")
+        print("请运行 /paper-workflow init 初始化项目，或传 --project 指定项目目录。")
         return 1
 
     try:
@@ -297,6 +314,8 @@ def main():
         description="paper-workflow CLI",
         prog="commands.py",
     )
+    parser.add_argument("--project", "-p", default=None,
+                        help="Project root directory (auto-detected from cwd if not set)")
     subparsers = parser.add_subparsers(dest="command", help="Commands")
 
     # status
@@ -315,12 +334,14 @@ def main():
 
     args = parser.parse_args()
 
+    project = getattr(args, "project", None)
+
     if args.command == "status":
-        return cmd_status(verbose=args.verbose)
+        return cmd_status(verbose=args.verbose, project=project)
     elif args.command == "resume":
-        return cmd_resume()
+        return cmd_resume(project=project)
     elif args.command == "run":
-        return cmd_run(args.stage, override=args.override)
+        return cmd_run(args.stage, override=args.override, project=project)
     else:
         parser.print_help()
         return 1
