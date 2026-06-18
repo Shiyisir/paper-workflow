@@ -48,6 +48,10 @@
 - [2026-06-16] **内部 API 参数名不一致**：literature_store.py / search_logger.py 使用 `project_root`，但 evidence_manager.py / export_references.py / render.py 使用 `project_dir` → 全部统一为 `project_dir`，旧参数名保留为 deprecated alias。
 - [2026-06-16] **commands.py 不支持 --project**：status / resume / run 要求用户 cd 到项目目录，但 render.py 和 qa_report.py 支持 --project → 所有 CLI 脚本统一支持 --project 参数，未传时自动向上查找 .paper-workflow/。
 - [2026-06-16] **export_references.py 缺少友好的 --project 缺失提示**：未传 --project 且不在项目目录内时直接报 AttributeError → 所有 CLI 入口统一使用 _find_project_root() 自动发现，找不到时输出 "[ERROR] 未找到 .paper-workflow/ 目录"。
+- [2026-06-16] **严禁编造文献**：不要"觉得应该引什么"就加什么。有参考 PDF → 先提取原文参考文献列表；无 PDF → 用 nature-academic-search / CrossRef API 搜索真实论文；每条 DOI 必须通过 CrossRef API 验证确认真实存在。违反 AGENTS.md 红线"不得编造论文内容、数据、引用、DOI"。
+- [2026-06-16] **spec 中的分类表必须全文交叉核验**：v0.2 spec 初稿中 executor_type 数量统计表与各章节实际列出的阶段不一致（hybrid 声明 1 个但实际列出 2 个，script 声明 6 个但实际只有 4 个）→ spec 写作完成后必须对每张分类表做"数量 = 实例枚举"的双向校验。
+- [2026-06-16] **skill_handoff 阶段的 done_conditions 必须拆两层**：literature_search 的 handoff 可以瞬间生成，但 catalog 新增记录需要用户实际执行搜索后才能完成 → skill_handoff 型阶段必须区分 `handoff_done`（handoff 文件已生成，进入 waiting_for_user）和 `stage_done`（用户完成 skill 执行后，产物满足完成条件）。不能混在一起，否则 `run` 会因为 catalog 还没记录直接 blocked。
+- [2026-06-16] **spec-first 比 code-first 省时间**：v0.1.x 直接编码导致后期需要统一参数名、补齐 --project。v0.2 先写 spec → 用户审核发现 6 处设计问题 → 修正 spec → 再写 implementation plan。6 个设计问题如果到编码阶段才发现，至少要多改 5 个文件 + 重写测试。
 
 ---
 
