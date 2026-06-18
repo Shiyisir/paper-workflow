@@ -1,6 +1,6 @@
 # 论文工作流
 
-学术写作工作台。`paper-workflow` 是编排层，管理论文项目从初始化到终稿输出的完整生命周期；搜索、阅读、写作、润色等重任务交给叶子 skill。
+学术写作工作台。`paper-workflow` 是编排层，管理论文项目从初始化到终稿输出的完整生命周期；搜索、阅读、写作、润色等重任务交给专项 skill。
 
 ## 快速理解
 
@@ -50,7 +50,7 @@ python .claude/skills/paper-workflow/scripts/commands.py status --project ./my-p
 # 4. 渲染输出
 python .claude/skills/paper-workflow/scripts/render.py \
   --project ./my-paper --profile thesis-cn \
-  --input manuscript/main.md --output-dir outputs
+  --input manuscript/main.md --output outputs
 
 # 5. 质量核验
 python .claude/skills/paper-workflow/scripts/qa_report.py \
@@ -121,7 +121,7 @@ my-paper/
 - docx 幂等后处理
 - 源稿 / 引文 / 输出 / 文献库四级校验
 - 统一 QA 报告
-- 283+ 测试覆盖
+- 481 测试覆盖
 
 ### 增强版（未实现）
 
