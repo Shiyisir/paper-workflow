@@ -1,0 +1,14 @@
+stage_id: material_prep
+phase: 1
+phase_label: 材料准备
+executor_type: manual
+input_artifacts: []
+output_artifacts:
+- materials/README.md
+preconditions: []
+done_conditions:
+- file_exists:materials/README.md
+quality_checks: []
+user_confirmation_required: true
+handoff_prompt_template: null
+fallback_on_failure: manual

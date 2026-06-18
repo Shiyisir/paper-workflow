@@ -1,0 +1,16 @@
+stage_id: data_analysis
+phase: 4
+phase_label: 数据分析
+executor_type: manual
+input_artifacts:
+- analysis/experiment-plan.md
+output_artifacts:
+- analysis/results.md
+preconditions:
+- file_exists:analysis/experiment-plan.md
+done_conditions:
+- file_exists:analysis/results.md
+quality_checks: []
+user_confirmation_required: true
+handoff_prompt_template: null
+fallback_on_failure: manual

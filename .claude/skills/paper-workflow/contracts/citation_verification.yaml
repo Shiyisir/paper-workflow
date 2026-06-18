@@ -1,0 +1,25 @@
+stage_id: citation_verification
+phase: 4
+phase_label: 引文校验
+executor_type: hybrid
+has_waiting_state: true
+script_module: validate_citations
+script_function: check_citekey_consistency
+followup_skill: nature-citation
+input_artifacts:
+- manuscript/main.md
+- literature/references.bib
+- literature/catalog.jsonl
+output_artifacts:
+- outputs/qa/citation-report.md
+preconditions:
+- file_exists:manuscript/main.md
+- file_exists:literature/references.bib
+done_conditions:
+- file_exists:outputs/qa/citation-report.md
+- qa_errors == 0
+quality_checks:
+- citekeys consistent across bib and catalog
+user_confirmation_required: false
+handoff_prompt_template: null
+fallback_on_failure: manual

@@ -1,0 +1,14 @@
+stage_id: requirements
+phase: 1
+phase_label: 需求确认
+executor_type: manual
+input_artifacts: []
+output_artifacts:
+- manuscript/notes.md
+preconditions: []
+done_conditions:
+- file_exists:manuscript/notes.md
+quality_checks: []
+user_confirmation_required: true
+handoff_prompt_template: null
+fallback_on_failure: manual

@@ -1,0 +1,36 @@
+stage_id: literature_search
+phase: 1
+phase_label: 文献检索
+executor_type: skill_handoff
+has_waiting_state: true
+required_skill:
+  zh: cnki-search
+  en: nature-academic-search
+input_artifacts:
+- .paper-workflow/config.yaml
+output_artifacts:
+- literature/catalog.jsonl
+- .paper-workflow/search-log.jsonl
+preconditions:
+- config.yaml has discipline and search_mode
+done_conditions: []
+handoff_done:
+- file_exists:.paper-workflow/handoffs/literature_search.json
+stage_done:
+- record_count:literature/catalog.jsonl > 0
+- record_count:.paper-workflow/search-log.jsonl > 0
+quality_checks:
+- every included record has DOI or source note
+user_confirmation_required: true
+handoff_prompt_template: '请使用 {skill} 为我搜索以下主题的学术文献：
+
+  论文主题：{topic}
+
+  学科领域：{discipline}
+
+  检索模式：{search_mode}
+
+  语言偏好：{language}
+
+  请将搜索结果（标题、作者、年份、期刊、DOI、摘要）整理后，我会筛选并导入文献库。'
+fallback_on_failure: manual

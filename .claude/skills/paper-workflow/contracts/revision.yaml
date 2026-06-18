@@ -1,0 +1,15 @@
+stage_id: revision
+phase: 6
+phase_label: 修订 (future)
+executor_type: manual
+not_in_v0.2_mvp: true
+input_artifacts:
+- outputs/qa/qa-report-vNNN.md
+- manuscript/main.md
+output_artifacts: []
+preconditions: []
+done_conditions: []
+quality_checks: []
+user_confirmation_required: true
+handoff_prompt_template: null
+fallback_on_failure: manual

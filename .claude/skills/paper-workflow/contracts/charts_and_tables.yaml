@@ -1,0 +1,35 @@
+stage_id: charts_and_tables
+phase: 5
+phase_label: 图表制作
+executor_type: skill_handoff
+has_waiting_state: true
+required_skill: nature-figure
+input_artifacts:
+- manuscript/main.md
+- analysis/
+- optional:materials/requirements/
+- optional:materials/templates/
+- optional:materials/examples/
+- optional:materials/notes/
+output_artifacts:
+- figures/
+- tables/
+preconditions:
+- file_exists:manuscript/main.md
+done_conditions: []
+handoff_done:
+- file_exists:.paper-workflow/handoffs/charts_and_tables.json
+stage_done:
+- file_exists:figures/
+quality_checks:
+- figure numbers are consecutive
+- figures cited in manuscript
+user_confirmation_required: true
+handoff_prompt_template: '请使用 nature-figure 为以下论文制作图表。
+
+  手稿：manuscript/main.md  数据：analysis/
+
+  可用项目材料：
+
+  {materials_summary}'
+fallback_on_failure: manual

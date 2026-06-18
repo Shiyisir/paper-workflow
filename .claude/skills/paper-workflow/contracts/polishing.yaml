@@ -1,0 +1,34 @@
+stage_id: polishing
+phase: 4
+phase_label: 语言润色
+executor_type: skill_handoff
+has_waiting_state: true
+required_skill: nature-polishing
+input_artifacts:
+- manuscript/main.md
+- optional:materials/requirements/
+- optional:materials/templates/
+- optional:materials/examples/
+- optional:materials/notes/
+output_artifacts:
+- manuscript/main.md
+preconditions:
+- file_exists:manuscript/main.md
+done_conditions: []
+handoff_done:
+- file_exists:.paper-workflow/handoffs/polishing.json
+stage_done:
+- file_exists:manuscript/main.md
+quality_checks:
+- no grammar or spelling errors
+user_confirmation_required: true
+handoff_prompt_template: '请使用 nature-polishing 润色以下论文。
+
+  手稿：manuscript/main.md
+
+  语言要求：Nature-level academic English
+
+  可用项目材料：
+
+  {materials_summary}'
+fallback_on_failure: manual

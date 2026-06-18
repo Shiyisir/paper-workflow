@@ -1,0 +1,14 @@
+stage_id: originality_check
+phase: 6
+phase_label: 原创性检查
+executor_type: manual
+input_artifacts:
+- manuscript/main.md
+output_artifacts: []
+preconditions:
+- file_exists:manuscript/main.md
+done_conditions: []
+quality_checks: []
+user_confirmation_required: true
+handoff_prompt_template: null
+fallback_on_failure: manual

@@ -281,7 +281,7 @@ def set_stage_status(
             "overridden": False,
         }
 
-    valid_statuses = {"pending", "in_progress", "done", "skipped", "blocked"}
+    valid_statuses = {"pending", "in_progress", "waiting_for_user", "pending_confirmation", "done", "skipped", "blocked"}
     if status not in valid_statuses:
         return {
             "success": False,

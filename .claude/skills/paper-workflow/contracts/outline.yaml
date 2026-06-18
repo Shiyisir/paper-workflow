@@ -1,0 +1,40 @@
+stage_id: outline
+phase: 3
+phase_label: 大纲撰写
+executor_type: skill_handoff
+has_waiting_state: true
+required_skill: nature-writing
+input_artifacts:
+- .paper-workflow/config.yaml
+- literature/evidence-matrix.csv
+- citations/claim-citation-map.csv
+- optional:materials/requirements/
+- optional:materials/templates/
+- optional:materials/examples/
+- optional:materials/notes/
+output_artifacts:
+- manuscript/outline.md
+preconditions: []
+done_conditions: []
+handoff_done:
+- file_exists:.paper-workflow/handoffs/outline.json
+stage_done:
+- file_exists:manuscript/outline.md
+quality_checks:
+- outline has at least 3 heading levels
+- each section maps to claims or evidence
+user_confirmation_required: true
+handoff_prompt_template: '请使用 nature-writing 的大纲模式，为以下论文撰写大纲。
+
+  论文类型：{paper_type}  研究类型：{research_type}  学科：{discipline}
+
+  已有证据：{evidence_summary}
+
+  已有论点：{claim_summary}
+
+  可用项目材料：
+
+  {materials_summary}
+
+  请生成包含章节标题和每节核心论点的完整大纲。输出到 manuscript/outline.md。'
+fallback_on_failure: manual
