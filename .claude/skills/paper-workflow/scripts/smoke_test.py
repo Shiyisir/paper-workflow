@@ -234,7 +234,7 @@ def main():
 
     # Write report
     repo_root = SCRIPTS_DIR.parent.parent.parent.parent
-    report_path = repo_root / "docs" / "superpowers" / "reports" / "2026-06-18-paper-workflow-v0.2-smoke-test.md"
+    report_path = repo_root / "docs" / "reports" / "2026-06-18-paper-workflow-v0.2-smoke-test.md"
     report_path.parent.mkdir(parents=True, exist_ok=True)
     report_path.write_text("\n".join(lines), encoding="utf-8")
 

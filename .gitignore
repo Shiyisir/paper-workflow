@@ -3,6 +3,13 @@
 outputs/
 !outputs/.gitkeep
 
+# Local paper projects and reference datasets
+papers/*
+!papers/README.md
+!papers/_reference/
+papers/_reference/*
+!papers/_reference/README.md
+
 # 外部技能资源（通过符号链接引入，非本仓库内容）
 .agents/skills/nature-figure/assets/
 

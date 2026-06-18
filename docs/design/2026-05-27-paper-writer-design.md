@@ -2,7 +2,7 @@
 
 > 日期：2026-05-27
 > 状态：已确认，待实施
-> 路径：docs/superpowers/specs/2026-05-27-paper-writer-design.md
+> 路径：docs/design/2026-05-27-paper-writer-design.md
 
 ---
 
