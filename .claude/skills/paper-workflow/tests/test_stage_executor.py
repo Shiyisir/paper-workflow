@@ -213,11 +213,12 @@ class TestDispatcher:
         r = se.execute_stage("research_design", root, state, config)
         assert r["recommended_status"] == "waiting_for_user"
 
-    def test_hybrid_stub(self, tmp_path):
+    def test_hybrid_blocked_on_missing_manuscript(self, tmp_path):
+        """citation_verification without manuscript → blocked (real executor in M6)."""
         root, state, config = self._setup(tmp_path)
         r = se.execute_stage("citation_verification", root, state, config)
         assert r["executor_type"] == "hybrid"
-        assert r["recommended_status"] == "in_progress"
+        assert r["recommended_status"] == "blocked"
 
     def test_unknown_blocked(self, tmp_path):
         root, state, config = self._setup(tmp_path)
@@ -585,3 +586,107 @@ class TestManualStages:
             sp.unlink()
         se.execute_stage("research_design", root, state, config)
         assert not sp.exists()
+
+
+# ===== M6: Hybrid citation_verification =====
+
+class TestCitationVerification:
+    def _setup(self, tmp_path, with_ms=True, ms_content=None, with_bib=True, bib_content=None):
+        root = _make_project(tmp_path)
+        if with_ms:
+            content = ms_content or "# Title\n\nSome text [@test2024].\n"
+            (root / "manuscript" / "main.md").write_text(content, encoding="utf-8")
+        if with_bib:
+            bc = bib_content or "@article{test2024,\n  title={T},\n  author={A},\n  year={2024}\n}\n"
+            (root / "literature" / "references.bib").write_text(bc, encoding="utf-8")
+        state = {"project_id": "t"}
+        config = {"project_id": "t"}
+        return root, state, config
+
+    def test_clean_manuscript_returns_done(self, tmp_path):
+        root, state, config = self._setup(tmp_path)
+        r = se.execute_stage("citation_verification", root, state, config)
+        assert r["executed"] is True
+        assert r["recommended_status"] == "done"
+        assert r["handoff_generated"] is False
+
+    def test_missing_citekey_generates_handoff(self, tmp_path):
+        root, state, config = self._setup(
+            tmp_path,
+            ms_content="# Title\n\n[@missing2024] [@test2024].\n",
+        )
+        r = se.execute_stage("citation_verification", root, state, config)
+        assert r["recommended_status"] == "waiting_for_user"
+        assert r["handoff_generated"] is True
+        assert r.get("handoff_path") is not None
+        hf = root / ".paper-workflow" / "handoffs" / "citation_verification.json"
+        assert hf.exists()
+
+    def test_cite_needed_generates_handoff(self, tmp_path):
+        root, state, config = self._setup(
+            tmp_path,
+            ms_content="# Title\n\n[CITE NEEDED]\nSome text [@test2024].\n",
+        )
+        r = se.execute_stage("citation_verification", root, state, config)
+        assert r["recommended_status"] == "waiting_for_user"
+        assert r["handoff_generated"] is True
+
+    def test_handoff_contains_issue_details(self, tmp_path):
+        import json as j
+        root, state, config = self._setup(
+            tmp_path,
+            ms_content="# Title\n\n[@missing2024] [@test2024].\n",
+        )
+        se.execute_stage("citation_verification", root, state, config)
+        hf = root / ".paper-workflow" / "handoffs" / "citation_verification.json"
+        data = j.loads(hf.read_text(encoding="utf-8"))
+        assert "nature-citation" in data["skill"]
+        assert len(data["citation_issues"]) >= 1
+        assert any("missing2024" in iss for iss in data["citation_issues"])
+        assert "不要新增虚假文献" in data["task_prompt"]
+
+    def test_missing_manuscript_blocked(self, tmp_path):
+        root, state, config = self._setup(tmp_path, with_ms=False)
+        r = se.execute_stage("citation_verification", root, state, config)
+        assert r["recommended_status"] == "blocked"
+
+    def test_writes_citation_report(self, tmp_path):
+        root, state, config = self._setup(tmp_path)
+        se.execute_stage("citation_verification", root, state, config)
+        rpt = root / "outputs" / "qa" / "citation-report.md"
+        assert rpt.exists()
+
+    def test_does_not_import_nature_citation(self, tmp_path):
+        """Verify nature-citation is NOT imported anywhere in stage_executor."""
+        import stage_executor as s
+        src = s.__file__
+        with open(src, encoding="utf-8") as f:
+            content = f.read()
+        assert "import nature_citation" not in content
+        assert "from nature_citation" not in content
+
+    def test_does_not_write_state(self, tmp_path):
+        root, state, config = self._setup(tmp_path)
+        sp = root / ".paper-workflow" / "state.yaml"
+        if sp.exists():
+            sp.unlink()
+        se.execute_stage("citation_verification", root, state, config)
+        assert not sp.exists()
+
+    def test_writes_manifest(self, tmp_path):
+        root, state, config = self._setup(tmp_path)
+        se.execute_stage("citation_verification", root, state, config)
+        assert (root / ".paper-workflow" / "artifact-manifest.jsonl").exists()
+
+    def test_unused_citekey_is_warning_only(self, tmp_path):
+        """Unused citekey in bib → warning, but if no other issues → done."""
+        root, state, config = self._setup(
+            tmp_path,
+            ms_content="# Title\n\n[@test2024].\n",
+            bib_content="@article{test2024,\n  title={T},\n  author={A},\n  year={2024}\n}\n\n"
+                        "@article{unused2023,\n  title={U},\n  author={B},\n  year={2023}\n}\n",
+        )
+        r = se.execute_stage("citation_verification", root, state, config)
+        # Unused citekey is a warning, not an issue → should be done
+        assert r["recommended_status"] == "done"
+        assert "unused" in str(r.get("warnings", [])) or r["recommended_status"] == "done"

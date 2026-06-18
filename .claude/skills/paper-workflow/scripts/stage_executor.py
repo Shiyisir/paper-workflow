@@ -798,8 +798,8 @@ def _execute_hybrid_stage(
     state: dict,
     config: dict,
 ) -> dict:
-    """Run script check then handoff if needed. STUB in v0.2 — M6 will implement."""
-    return {
+    """Run script check then handoff if needed (M6: real implementation)."""
+    base = {
         "executed": False,
         "stage_id": stage_id,
         "executor_type": "hybrid",
@@ -807,9 +807,190 @@ def _execute_hybrid_stage(
         "handoff_generated": False,
         "requires_confirmation": False,
         "artifacts": [],
-        "warnings": ["[v0.2 stub] hybrid executor not yet implemented"],
+        "warnings": [],
         "blocked_reason": None,
     }
+
+    if stage_id != "citation_verification":
+        base["recommended_status"] = "blocked"
+        base["blocked_reason"] = f"Unknown hybrid stage: {stage_id}"
+        return base
+
+    return _exec_citation_verification(project_dir, base)
+
+
+# ---------------------------------------------------------------------------
+# M6.1: citation_verification hybrid executor
+# ---------------------------------------------------------------------------
+
+def _exec_citation_verification(project_dir: Path, base: dict) -> dict:
+    """Hybrid: run validate_citations.py, handoff to nature-citation if issues found."""
+    import json as _json
+
+    manuscript = project_dir / "manuscript" / "main.md"
+    bib = project_dir / "literature" / "references.bib"
+    catalog = project_dir / "literature" / "catalog.jsonl"
+    claim_map = project_dir / "citations" / "claim-citation-map.csv"
+
+    # Check required files
+    if not manuscript.exists():
+        base["recommended_status"] = "blocked"
+        base["blocked_reason"] = "manuscript/main.md not found"
+        return base
+
+    from validate_citations import (
+        check_citekey_consistency,
+        find_cite_needed,
+    )
+
+    # Run citation checks
+    issues = []
+    warnings = []
+
+    # 1. [CITE NEEDED] detection
+    cite_needed = find_cite_needed(manuscript)
+    if cite_needed:
+        lines = [f"line {c['line']}" for c in cite_needed]
+        issues.append(f"[CITE NEEDED] found at: {', '.join(lines)} ({len(cite_needed)} occurrences)")
+
+    # 2. Citekey consistency (manuscript vs bib)
+    if bib.exists():
+        consistency = check_citekey_consistency(manuscript, bib)
+        missing_in_bib = consistency.get("missing_in_bib", [])
+        unused_in_text = consistency.get("unused_in_text", [])
+        if missing_in_bib:
+            issues.append(f"Missing in bib: {', '.join(missing_in_bib)}")
+        if unused_in_text:
+            warnings.append(f"Unused in text: {', '.join(unused_in_text)} ({len(unused_in_text)} citekeys)")
+    else:
+        warnings.append("references.bib not found, skipping citekey consistency check")
+
+    # 3. Claim-citation cross-check (if claim map exists)
+    if claim_map.exists():
+        try:
+            import csv as _csv
+            claim_citekeys = set()
+            with open(claim_map, encoding="utf-8") as f:
+                reader = _csv.reader(f)
+                header = next(reader, None)
+                citekey_col = header.index("citekeys") if header and "citekeys" in header else None
+                if citekey_col is not None:
+                    for row in reader:
+                        if len(row) > citekey_col:
+                            for ck in row[citekey_col].split(";"):
+                                ck = ck.strip()
+                                if ck:
+                                    claim_citekeys.add(ck)
+            # Check claim citekeys exist in catalog
+            if catalog.exists() and claim_citekeys:
+                cat_keys = set()
+                with open(catalog, encoding="utf-8") as f:
+                    for line in f:
+                        line = line.strip()
+                        if line:
+                            try:
+                                rec = _json.loads(line)
+                                cat_keys.add(rec.get("citekey", ""))
+                            except _json.JSONDecodeError:
+                                pass
+                missing_in_cat = claim_citekeys - cat_keys
+                if missing_in_cat:
+                    warnings.append(f"Claim citekeys not in catalog: {', '.join(missing_in_cat)}")
+        except Exception as e:
+            warnings.append(f"Could not check claim-citation-map: {e}")
+
+    # Write citation report
+    qa_dir = project_dir / "outputs" / "qa"
+    qa_dir.mkdir(parents=True, exist_ok=True)
+    report_path = qa_dir / "citation-report.md"
+    report_lines = ["# Citation Verification Report", "", f"Manuscript: manuscript/main.md", ""]
+    report_lines.append(f"**Issues**: {len(issues)}")
+    for iss in issues:
+        report_lines.append(f"- {iss}")
+    report_lines.append("")
+    report_lines.append(f"**Warnings**: {len(warnings)}")
+    for w in warnings:
+        report_lines.append(f"- {w}")
+    report_path.write_text("\n".join(report_lines), encoding="utf-8")
+
+    artifacts = ["outputs/qa/citation-report.md"]
+
+    if issues:
+        # Problems found → generate nature-citation handoff
+        # Build task prompt for nature-citation
+        task_lines = [
+            "请使用 nature-citation 修复以下引文问题。",
+            "",
+            "**重要约束**：",
+            "- 不要新增虚假文献。",
+            "- 优先使用 literature/catalog.jsonl 和 literature/references.bib 中已有文献。",
+            "- 如果确实缺文献，请标记需要用户补充，不要编造 citekey。",
+            "- 修复后保持正文含义不变。",
+            "",
+            "**检测到的问题**：",
+        ]
+        for iss in issues:
+            task_lines.append(f"- {iss}")
+        if warnings:
+            task_lines.append("")
+            task_lines.append("**注意**：")
+            for w in warnings:
+                task_lines.append(f"- {w}")
+
+        task_prompt = "\n".join(task_lines)
+
+        handoff_data = {
+            "stage_id": "citation_verification",
+            "executor_type": "hybrid",
+            "generated_at": __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat(),
+            "status": "waiting_for_user",
+            "skill": "nature-citation",
+            "task_prompt": task_prompt,
+            "citation_issues": issues,
+            "input_files": {
+                "manuscript/main.md": {"exists": manuscript.exists()},
+                "literature/references.bib": {"exists": bib.exists()},
+                "literature/catalog.jsonl": {"exists": catalog.exists()},
+            },
+            "expected_outputs": ["manuscript/main.md (fixed)"],
+            "warnings": warnings,
+            "retry_count": 0,
+        }
+
+        handoffs_dir = project_dir / ".paper-workflow" / "handoffs"
+        handoffs_dir.mkdir(parents=True, exist_ok=True)
+        hf_path = handoffs_dir / "citation_verification.json"
+        hf_path.write_text(
+            _json.dumps(handoff_data, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+
+        # Update latest
+        (handoffs_dir / "latest.json").write_text(
+            _json.dumps({"stage_id": "citation_verification", "timestamp": handoff_data["generated_at"]},
+                       ensure_ascii=False),
+            encoding="utf-8",
+        )
+
+        artifacts.append(".paper-workflow/handoffs/citation_verification.json")
+
+        log_artifacts(project_dir, "citation_verification", artifacts, "hybrid:nature-citation")
+
+        base["executed"] = True
+        base["recommended_status"] = "waiting_for_user"
+        base["handoff_generated"] = True
+        base["handoff_path"] = ".paper-workflow/handoffs/citation_verification.json"
+        base["artifacts"] = artifacts
+        base["warnings"] = warnings
+        return base
+    else:
+        # Clean — no issues
+        log_artifacts(project_dir, "citation_verification", artifacts, "validate_citations.py")
+        base["executed"] = True
+        base["recommended_status"] = "done"
+        base["artifacts"] = artifacts
+        base["warnings"] = warnings
+        return base
 
 
 # ---------------------------------------------------------------------------
