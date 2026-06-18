@@ -72,7 +72,7 @@ Every CNKI skill follows the same refactoring pattern:
 | File | Decision | Reason |
 |---|---|---|
 | `.claude/settings.json` | **Delete / add to .gitignore** | Chrome DevTools MCP config — belongs in `C:\Users\易朝亮\.claude\settings.json`, not project repo |
-| `CLAUDE.md` | **Delete** | Single line, redundant. CLAUDE.md already exists at project root |
+| `CLAUDE.md` | **Keep** | Claude Code 标准入口文件，通过 `@AGENTS.md` + `@CONTEXT.md` 委托到已有项目说明，符合 CC 官方推荐做法。([Claude Code docs](https://code.claude.com/docs/en/memory)) |
 | `docs/superpowers/plans/2026-06-12-paper-workflow-implementation-plan.md` | **Move to docs/design/** | Valuable — v0.1 implementation plan |
 | `docs/superpowers/plans/2026-06-16-paper-workflow-v0.2-stage-executor-implementation-plan.md` | **Move to docs/design/** | Valuable — v0.2 stage executor plan |
 | `docs/superpowers/specs/2026-06-16-paper-workflow-v0.2-stage-executor.md` | **Move to docs/design/** | Valuable — v0.2 stage executor spec |
@@ -101,9 +101,15 @@ Note: These 3 docs are in `docs/superpowers/` which no longer exists on master. 
 - **Rebase onto current master first** to pick up directory reorg
 - Drop .gitignore changes (master's version is better)
 
-### Branch 3: Delete local files
-- `.claude/settings.json` → delete from repo
-- `CLAUDE.md` → delete (redundant)
+### Branch 3: Remove local config + move untracked docs
+- `.claude/settings.json` → delete from repo (local MCP config, not portable)
+- `CLAUDE.md` → keep and track (CC standard entry point, confirmed by docs)
 - Move 3 untracked docs to `docs/design/` (after rebase)
+
+## 7. Corrections
+
+**2026-06-18**: Section 4 originally marked `CLAUDE.md` as "Delete — redundant". This was incorrect. `CLAUDE.md` is the Claude Code standard entry point file. The pattern `@AGENTS.md` + `@CONTEXT.md` delegates to existing project docs via CC's `@import` syntax, which is the officially recommended approach per [Claude Code docs](https://code.claude.com/docs/en/memory). Judgment corrected to **Keep**.
+
+`.claude/settings.json` judgment unchanged — it contains local Chrome MCP config and should not be committed to the repo.
 
 **Current branch `wip/unrelated-cnki-root-changes` can be deleted after splitting.**
