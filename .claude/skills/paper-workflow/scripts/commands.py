@@ -32,6 +32,7 @@ from workflow_state import (
 from stage_executor import (
     load_contract,
     check_done_conditions,
+    execute_stage,
 )
 
 
@@ -51,18 +52,22 @@ def _resolve_project_dir(explicit: str | None = None) -> Path | None:
 
 
 # ---------------------------------------------------------------------------
-# Stage executors (stubs — will be filled in M3–M7)
+# Stage executor (replaced stub in M7.1 — delegates to stage_executor)
 # ---------------------------------------------------------------------------
 
-def _execute_stage(stage_id: str) -> dict:
-    """Execute a stage's logic. Currently a stub.
+def _execute_stage(stage_id: str, project_dir, state, config, override=False) -> dict:
+    """Execute a stage's logic via stage_executor.execute_stage().
 
-    Returns a dict with execution result for logging.
-    Future milestones will implement real stage logic here.
+    Returns the full execution result dict. Does NOT write state.yaml.
+    Kept as a thin wrapper so cmd_run() can call it cleanly.
     """
-    print(f"  [stub] 阶段 '{stage_id}' 的执行逻辑尚未实现")
-    print(f"  [stub] 该阶段将在后续里程碑中填充")
-    return {"executed": False, "reason": "stub — not yet implemented"}
+    return execute_stage(
+        stage_id=stage_id,
+        project_dir=project_dir,
+        state=state,
+        config=config,
+        override=override,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -124,6 +129,29 @@ def cmd_status(verbose: bool = False, project: str | None = None) -> int:
             for reason in b.get("blockers", []):
                 print(f"    原因: {reason}")
         print()
+
+    # Status-specific guidance
+    current_stage_data = get_stage(state, current_stage)
+    if current_stage_data:
+        st = current_stage_data.get("status", "")
+        if st == "waiting_for_user":
+            handoff_path = root / ".paper-workflow" / "handoffs" / f"{current_stage}.json"
+            if handoff_path.exists():
+                print(f"\n等待用户完成")
+                print(f"handoff 文件路径：.paper-workflow/handoffs/{current_stage}.json")
+                print(f"下一步：执行对应 skill 后运行 confirm")
+            else:
+                print(f"\n等待用户完成")
+                print(f"下一步：手动完成后运行 confirm {current_stage}")
+        elif st == "pending_confirmation":
+            script_dir = str(Path(__file__).resolve().parent)
+            print(f"\n产物已生成，等待用户确认")
+            print(f"下一步：python {script_dir}/commands.py confirm {current_stage} --project ...")
+        elif st == "blocked":
+            blockers = current_stage_data.get("blockers", [])
+            print(f"\n阶段被阻塞")
+            for b in blockers:
+                print(f"原因：{b}")
 
     # Next stages
     next_stages = get_next_stages(state)
@@ -198,12 +226,26 @@ def cmd_resume(project: str | None = None) -> int:
         print("你可以继续推进此阶段，或运行 /paper-workflow status 查看详情。")
         return 0
 
+    elif status == "waiting_for_user":
+        handoff_path = root / ".paper-workflow" / "handoffs" / f"{current_stage}.json"
+        if handoff_path.exists():
+            print(f"\n当前阶段需要你完成外部操作或 skill handoff。")
+            print(f"handoff 文件：.paper-workflow/handoffs/{current_stage}.json")
+            print(f"完成后运行 confirm。")
+        else:
+            print(f"\n当前阶段等待用户完成。完成后运行 confirm。")
+        return 0
+
+    elif status == "pending_confirmation":
+        print(f"\n当前阶段已生成产物，等待确认。")
+        print(f"请检查产物后运行 confirm。")
+        return 0
+
     elif status == "blocked":
         blockers = current.get("blockers", [])
-        print(f"\n阶段 '{current_stage}' 被阻塞:")
+        print(f"\n当前阶段被阻塞，请根据 blocked_reason 修复后重新 run 或 override。")
         for b in blockers:
             print(f"  - {b}")
-        print("\n修复阻塞原因后，用 /paper-workflow run {current_stage} 重新开始。")
         return 1
 
     elif status == "done":
@@ -240,7 +282,7 @@ def cmd_resume(project: str | None = None) -> int:
 # ---------------------------------------------------------------------------
 
 def cmd_run(stage_id: str, override: bool = False, project: str | None = None) -> int:
-    """Run a specific stage."""
+    """Run a specific stage via stage_executor."""
     root = _resolve_project_dir(project)
     if root is None:
         print("错误：未找到 paper-workflow 项目。")
@@ -254,6 +296,7 @@ def cmd_run(stage_id: str, override: bool = False, project: str | None = None) -
         return 1
 
     state = loaded["state"]
+    config = loaded["config"]
 
     # Check stage exists
     stage = get_stage(state, stage_id)
@@ -287,21 +330,103 @@ def cmd_run(stage_id: str, override: bool = False, project: str | None = None) -
 
     print(f"执行阶段: {stage_id} ({current_status} → in_progress)")
 
-    # Execute the stage logic
-    exec_result = _execute_stage(stage_id)
+    # Execute the stage via stage_executor (M7.1: replaces old stub)
+    exec_result = _execute_stage(
+        stage_id=stage_id,
+        project_dir=root,
+        state=state,
+        config=config,
+        override=override,
+    )
 
-    # Mark as done
-    done_result = set_stage_status(state, stage_id, "done", override=override)
-    if done_result["success"]:
-        print(f"阶段 '{stage_id}' 完成。")
-    else:
-        print(f"阶段 '{stage_id}' 执行完成，但标记 done 失败: {done_result['message']}")
-        # Save partial progress
+    recommended = exec_result.get("recommended_status", "blocked")
+    handoff_generated = exec_result.get("handoff_generated", False)
+    requires_manual = exec_result.get("requires_manual_action", False)
+    requires_confirmation = exec_result.get("requires_confirmation", False)
+
+    # ── Result handling ──────────────────────────────────────────
+
+    if recommended == "done":
+        # Script / hybrid-clean path: verify done_conditions before marking done
+        all_met, unmet = check_done_conditions(stage_id, root)
+        if all_met:
+            done_result = set_stage_status(state, stage_id, "done", override=override)
+            if done_result["success"]:
+                save_state(state, root)
+                print(f"阶段 '{stage_id}' 完成。")
+                # Show warnings if any
+                for w in exec_result.get("warnings", []):
+                    print(f"  [WARN] {w}")
+            else:
+                save_state(state, root)
+                print(f"阶段 '{stage_id}' 执行完成，但标记 done 失败: {done_result['message']}")
+                return 1
+        else:
+            mark_stage_blocked(
+                state, stage_id,
+                f"done_conditions not met: {'; '.join(unmet)}"
+            )
+            save_state(state, root)
+            print(f"阶段 '{stage_id}' 执行完成，但 done_conditions 不满足:")
+            for u in unmet:
+                print(f"  - {u}")
+            print("请补齐产物后运行 confirm，或用 --override 强制确认。")
+            return 1
+
+    elif recommended == "pending_confirmation":
+        # Script stage with user_confirmation_required (e.g., evidence_matrix)
+        set_stage_status(state, stage_id, "pending_confirmation", override=override)
         save_state(state, root)
+        print(f"产物已生成，等待用户确认。")
+        for a in exec_result.get("artifacts", []):
+            print(f"  - {a}")
+        script_dir = str(Path(__file__).resolve().parent)
+        print(f"下一步：python {script_dir}/commands.py confirm {stage_id} --project {root}")
+        for w in exec_result.get("warnings", []):
+            print(f"  [WARN] {w}")
+
+    elif recommended == "waiting_for_user":
+        # skill_handoff or manual or hybrid-issues path
+        set_stage_status(state, stage_id, "waiting_for_user", override=override)
+        save_state(state, root)
+
+        if handoff_generated:
+            handoff_path = exec_result.get("handoff_path", "")
+            print(f"\n已生成 handoff 任务包：")
+            print(f"  {handoff_path}")
+            print(f"\n请执行对应 skill 完成产物后，再运行：")
+            script_dir = str(Path(__file__).resolve().parent)
+            print(f"  python {script_dir}/commands.py confirm {stage_id} --project {root}")
+        elif requires_manual:
+            msg = exec_result.get("message", "")
+            if msg:
+                print(msg)
+            else:
+                print(f"阶段 '{stage_id}' 需要你手动完成。")
+                print(f"完成后运行 confirm {stage_id}。")
+        else:
+            print(f"阶段 '{stage_id}' 等待用户完成。")
+            print(f"完成后运行 confirm {stage_id}。")
+
+        for w in exec_result.get("warnings", []):
+            print(f"  [WARN] {w}")
+
+    elif recommended == "blocked":
+        # Executor blocked (missing files, errors, etc.)
+        reason = exec_result.get("blocked_reason", "unknown error")
+        mark_stage_blocked(state, stage_id, reason)
+        save_state(state, root)
+        print(f"阶段 '{stage_id}' 被阻塞。")
+        print(f"原因：{reason}")
+        for w in exec_result.get("warnings", []):
+            print(f"  [WARN] {w}")
         return 1
 
-    # Save final state
-    save_state(state, root)
+    else:
+        # Unknown recommended_status — save state as-is and flag
+        save_state(state, root)
+        print(f"警告：未知的 recommended_status '{recommended}'，阶段保持 in_progress。")
+        return 1
 
     # Show next steps
     next_stages = get_next_stages(state)
