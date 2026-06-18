@@ -3,6 +3,14 @@
 outputs/
 !outputs/.gitkeep
 
+# papers/ 本地论文项目大文件和二进制（默认忽略，按需 git add -f）
+papers/**/*.pdf
+papers/**/*.docx
+papers/**/*.zip
+papers/**/*.png
+papers/**/*.jpg
+papers/**/*.jpeg
+
 # 外部技能资源（通过符号链接引入，非本仓库内容）
 .agents/skills/nature-figure/assets/
 
