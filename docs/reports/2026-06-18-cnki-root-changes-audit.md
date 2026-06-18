@@ -110,6 +110,6 @@ Note: These 3 docs are in `docs/superpowers/` which no longer exists on master. 
 
 **2026-06-18**: Section 4 originally marked `CLAUDE.md` as "Delete — redundant". This was incorrect. `CLAUDE.md` is the Claude Code standard entry point file. The pattern `@AGENTS.md` + `@CONTEXT.md` delegates to existing project docs via CC's `@import` syntax, which is the officially recommended approach per [Claude Code docs](https://code.claude.com/docs/en/memory). Judgment corrected to **Keep**.
 
-`.claude/settings.json` judgment unchanged — it contains local Chrome MCP config and should not be committed to the repo.
+**2026-06-18**: `.claude/settings.json` judgment updated. The original audit note treated it as a local-only file to delete. After inspection, the file was confirmed to contain only the Chrome DevTools MCP configuration required by CNKI skills — no machine-specific paths, tokens, or secrets. Decision: do not keep `.claude/settings.json` as a repository file. Migrate the reusable MCP configuration to project-scoped `.mcp.json`. Reason: `.mcp.json` is the appropriate project-level place for shared MCP server configuration. See `docs/setup-cnki-mcp.md` for setup instructions.
 
 **Current branch `wip/unrelated-cnki-root-changes` can be deleted after splitting.**
