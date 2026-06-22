@@ -1,37 +1,169 @@
 ---
 name: cnki-navigate-pages
-description: 当用户在知网搜索结果中说"下一页""上一页""翻到第N页""按时间排序""按被引排序""按下载排序"时加载。通过单次 evaluate_script 完成翻页或排序。
-argument-hint: "[next|previous|page N|sort by date|citations|downloads|relevance|comprehensive]"
+description: Navigate CNKI search result pages (next/previous/specific page) or change sort order. Use when user wants to see more results or change sorting.
+argument-hint: "[next|previous|page N|sort by date|citations|downloads]"
 ---
 
-# CNKI 翻页与排序
+# CNKI Results Pagination and Sorting
 
-在知网搜索结果页上翻页或切换排序方式。所有操作均用单次 `evaluate_script`。
+All operations use a single async `mcp__chrome-devtools__evaluate_script` — no snapshot or wait_for needed.
 
-## 流程
+$PREFLIGHT
 
-### 翻页
+## Preflight
 
-执行 `scripts/navigate.js` 翻页函数，替换 `ACTION_HERE` 为 `"next"` / `"previous"` / `"page 3"`。
+Before using this skill:
 
-### 排序
+1. Confirm that Chrome DevTools MCP is configured and available.
+2. Confirm that a Chrome tab can be inspected through the MCP connection.
+3. Confirm that CNKI is open, or ask the user to open CNKI in Chrome.
+4. If CNKI requires login, ask the user to complete login manually in Chrome before continuing.
+5. If Chrome DevTools MCP is unavailable, stop and ask the user to follow `docs/setup-cnki-mcp.md`.
+6. Do not fabricate CNKI results, citations, download links, journal metadata, or page content.
 
-执行 `scripts/navigate.js` 排序函数，替换 `SORT_HERE` 为：
-- `relevance`（相关度）
-- `date`（发表时间）
-- `citations`（被引）
-- `downloads`（下载）
-- `comprehensive`（综合）
 
-## 工具调用: 1 (evaluate_script)
+**Capability note**: Fully automated CNKI page navigation may be blocked by CNKI CAPTCHA. If CNKI redirects to verify/home, stop and ask the user to complete manual action. Preferred compliant workflow is manual navigation by the user in the same Chrome instance/profile as MCP, followed by MCP read-only extraction. See docs/setup-cnki-mcp.md for details.
 
-## 关键 Gotchas
+## Arguments
+## Preflight
 
-- 翻页/排序后页面重置，先前提取的结果作废。
-- 等待策略：检测 `.countPageMark` 变化确认页面已刷新，不要用固定 `setTimeout`。
-- 验证码见 `../../references/cnki-captcha.md`。
+Before using this skill:
 
-## 附带文件
+1. Confirm that Chrome DevTools MCP is configured and available.
+2. Confirm that a Chrome tab can be inspected through the MCP connection.
+3. Confirm that CNKI is open, or ask the user to open CNKI in Chrome.
+4. If CNKI requires login, ask the user to complete login manually in Chrome before continuing.
+5. If Chrome DevTools MCP is unavailable, stop and ask the user to follow `docs/setup-cnki-mcp.md`.
+6. Do not fabricate CNKI results, citations, download links, journal metadata, or page content.
 
-- `scripts/navigate.js` — 翻页 + 排序函数
-- `../../references/cnki-common-selectors.md` — 翻页/排序选择器
+
+`$ARGUMENTS` should be one of:
+- `next` / `previous` / `page N` — pagination
+- `sort by date` / `sort by citations` / `sort by downloads` / `sort by relevance` / `sort by comprehensive` — sorting
+
+## Pagination (single mcp__chrome-devtools__evaluate_script)
+
+Replace `ACTION_HERE` with `"next"`, `"previous"`, or `"page 3"`:
+
+```javascript
+async () => {
+  const cap = document.querySelector('#tcaptcha_transform_dy');
+  if (cap && cap.getBoundingClientRect().top >= 0) return { error: 'captcha' };
+
+  const action = "ACTION_HERE";
+  const pageLinks = document.querySelectorAll('.pages a');
+  const prevMark = document.querySelector('.countPageMark')?.innerText;
+
+  if (action === 'next') {
+    const next = Array.from(pageLinks).find(a => a.innerText.trim() === '下一页');
+    if (!next) return { error: 'no_next_page' };
+    next.click();
+  } else if (action === 'previous') {
+    const prev = Array.from(pageLinks).find(a => a.innerText.trim() === '上一页');
+    if (!prev) return { error: 'no_previous_page' };
+    prev.click();
+  } else {
+    const num = action.replace(/\D/g, '');
+    const target = Array.from(pageLinks).find(a => a.innerText.trim() === num);
+    if (!target) return { error: 'page_not_found', available: Array.from(pageLinks).map(a => a.innerText.trim()) };
+    target.click();
+  }
+
+  // Wait for page change
+  await new Promise((r, j) => {
+    let n = 0;
+    const c = () => {
+      const mark = document.querySelector('.countPageMark')?.innerText;
+      if (mark && mark !== prevMark) r();
+      else if (++n > 30) j('timeout');
+      else setTimeout(c, 500);
+    };
+    setTimeout(c, 1000);
+  });
+
+  const cap2 = document.querySelector('#tcaptcha_transform_dy');
+  if (cap2 && cap2.getBoundingClientRect().top >= 0) return { error: 'captcha' };
+
+  return {
+    action,
+    total: document.querySelector('.pagerTitleCell')?.innerText?.match(/([\d,]+)/)?.[1] || '0',
+    page: document.querySelector('.countPageMark')?.innerText || '?',
+    url: location.href
+  };
+}
+```
+
+## Sorting (single mcp__chrome-devtools__evaluate_script)
+
+Replace `SORT_HERE` with `"relevance"`, `"date"`, `"citations"`, `"downloads"`, or `"comprehensive"`:
+
+```javascript
+async () => {
+  const cap = document.querySelector('#tcaptcha_transform_dy');
+  if (cap && cap.getBoundingClientRect().top >= 0) return { error: 'captcha' };
+
+  const sortBy = "SORT_HERE";
+  const idMap = {
+    'relevance': 'FFD', 'date': 'PT',
+    'citations': 'CF', 'downloads': 'DFR', 'comprehensive': 'ZH'
+  };
+
+  const liId = idMap[sortBy];
+  if (!liId) return { error: 'invalid_sort', valid: Object.keys(idMap) };
+
+  const li = document.querySelector('#orderList li#' + liId);
+  if (!li) return { error: 'sort_option_not_found' };
+
+  const prevMark = document.querySelector('.countPageMark')?.innerText;
+  li.click();
+
+  // Wait for results to refresh (page resets to 1)
+  await new Promise((r, j) => {
+    let n = 0;
+    const c = () => {
+      const mark = document.querySelector('.countPageMark')?.innerText;
+      if (mark && mark !== prevMark) r();
+      else if (++n > 30) j('timeout');
+      else setTimeout(c, 500);
+    };
+    setTimeout(c, 1000);
+  });
+
+  return {
+    sortBy,
+    total: document.querySelector('.pagerTitleCell')?.innerText?.match(/([\d,]+)/)?.[1] || '0',
+    page: document.querySelector('.countPageMark')?.innerText || '?',
+    activeLi: document.querySelector('#orderList li.cur')?.innerText?.trim(),
+    url: location.href
+  };
+}
+```
+
+## Output
+
+> Navigated to page {page}. Total {total} results.
+> Results now sorted by {sortBy}.
+
+## Tool calls: 1 (mcp__chrome-devtools__evaluate_script only)
+
+## Verified selectors
+
+| Element | Selector | Notes |
+|---------|----------|-------|
+| Page links | `.pages a` | numbers + 上一页/下一页 |
+| Current page | `.pages a.cur` | |
+| Next page | text `下一页`, class `pagesnums` | |
+| Page counter | `.countPageMark` | text "1/300" |
+| Sort container | `#sortList` (`.order-group`) | |
+| Sort options | `#orderList li` | click to sort |
+| 相关度 | `li#FFD` | data-sort="FFD" |
+| 发表时间 | `li#PT` | data-sort="PT" |
+| 被引 | `li#CF` | data-sort="CF" |
+| 下载 | `li#DFR` | data-sort="DFR" |
+| 综合 | `li#ZH` | data-sort="ZH" |
+| Active sort | `#orderList li.cur` | has class `cur` |
+
+## Captcha detection
+
+Check `#tcaptcha_transform_dy` element's `getBoundingClientRect().top >= 0`.
+Only active when `top >= 0` (visible). Pre-loaded SDK sits at `top: -1000000px`.

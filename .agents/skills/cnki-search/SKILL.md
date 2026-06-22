@@ -1,34 +1,160 @@
 ---
 name: cnki-search
-description: 当用户说"搜知网""找中文论文""查国内文献""在知网搜XX""搜一下知网"时加载。通过 Chrome 自动搜索 CNKI 并提取结构化结果列表。
-argument-hint: "[搜索关键词]"
+description: Search CNKI (中国知网) for papers by keyword. Use when the user wants to find academic papers on a topic.
+argument-hint: "[search keywords]"
 ---
 
-# CNKI 基础搜索
+# CNKI Basic Search
 
-在知网按关键词搜索论文，返回结构化结果（标题、作者、期刊、日期、被引、下载）。
+Search CNKI for papers using keyword(s). Returns result count and structured result list (titles, URLs, authors, journal, date) in a single call.
 
-## 流程
+$PREFLIGHT
 
-1. **navigate** → `https://kns.cnki.net/kns8s/search`
-2. **evaluate_script** → 执行 `scripts/search.js`（替换 `YOUR_KEYWORDS`）
-3. **报告** → 按编号列表展示结果
+## Preflight
 
-## 工具调用: 2 (navigate + evaluate_script)
+Before using this skill:
 
-## 关键 Gotchas
+1. Confirm that Chrome DevTools MCP is configured and available.
+2. Confirm that a Chrome tab can be inspected through the MCP connection.
+3. Confirm that CNKI is open, or ask the user to open CNKI in Chrome.
+4. If CNKI requires login, ask the user to complete login manually in Chrome before continuing.
+5. If Chrome DevTools MCP is unavailable, stop and ask the user to follow `docs/setup-cnki-mcp.md`.
+6. Do not fabricate CNKI results, citations, download links, journal metadata, or page content.
 
-- **不要 click 标题链接**：click 打开新 tab，浪费 3 个额外调用。用 `navigate_page` 直接访问 `href`。
-- **搜索框需 dispatchEvent**：知网用 React，`input.value = query` 不触发 onChange → 必须 `dispatchEvent(new Event('input', { bubbles: true }))`。
-- **验证码误判**：tcaptcha SDK 在 `top: -1000000px` 预载 DOM 是正常行为，只有 `top >= 0` 才是真验证码。详见 `../../references/cnki-captcha.md`。
 
-## 不要导航到详情页
+**Capability note**: Fully automated CNKI page navigation may be blocked by CNKI CAPTCHA. If CNKI redirects to verify/home, stop and ask the user to complete manual action. Preferred compliant workflow is manual navigation by the user in the same Chrome instance/profile as MCP, followed by MCP read-only extraction. See docs/setup-cnki-mcp.md for details.
 
-用户想看某篇论文时，用 `navigate_page` + 结果的 `href` 值，不要 click 链接。
+## Arguments
+## Preflight
 
-## 附带文件
+Before using this skill:
 
-- `scripts/search.js` — 搜索 + 提取的 JS 代码
-- `references/selectors.md` — 此 skill 的独有选择器
-- `../../references/cnki-common-selectors.md` — 搜索结果页通用选择器
-- `../../references/cnki-captcha.md` — 验证码检测逻辑
+1. Confirm that Chrome DevTools MCP is configured and available.
+2. Confirm that a Chrome tab can be inspected through the MCP connection.
+3. Confirm that CNKI is open, or ask the user to open CNKI in Chrome.
+4. If CNKI requires login, ask the user to complete login manually in Chrome before continuing.
+5. If Chrome DevTools MCP is unavailable, stop and ask the user to follow `docs/setup-cnki-mcp.md`.
+6. Do not fabricate CNKI results, citations, download links, journal metadata, or page content.
+
+
+$ARGUMENTS contains the search keyword(s) in Chinese or English.
+
+## Steps
+
+### 1. Navigate
+
+Use `mcp__chrome-devtools__navigate_page` → `https://kns.cnki.net/kns8s/search`
+
+### 2. Search + extract results (single evaluate_script, NO wait_for)
+
+Replace `YOUR_KEYWORDS` with actual search terms:
+
+```javascript
+async () => {
+  const query = "YOUR_KEYWORDS";
+
+  // Wait for search input (replaces wait_for)
+  await new Promise((r, j) => {
+    let n = 0;
+    const c = () => { if (document.querySelector('input.search-input')) r(); else if (++n > 30) j('timeout'); else setTimeout(c, 500); };
+    c();
+  });
+
+  // Check captcha (only if visible on screen, not hidden SDK at top:-1000000)
+  const outer = document.querySelector('#tcaptcha_transform_dy');
+  if (outer && outer.getBoundingClientRect().top >= 0) return { error: 'captcha' };
+
+  // Fill and submit (verified selectors: input.search-input, input.search-btn)
+  const input = document.querySelector('input.search-input');
+  input.value = query;
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+  document.querySelector('input.search-btn')?.click();
+
+  // Wait for results
+  await new Promise((r, j) => {
+    let n = 0;
+    const c = () => { if (document.body.innerText.includes('条结果')) r(); else if (++n > 30) j('timeout'); else setTimeout(c, 500); };
+    c();
+  });
+
+  // Check captcha again
+  const outer2 = document.querySelector('#tcaptcha_transform_dy');
+  if (outer2 && outer2.getBoundingClientRect().top >= 0) return { error: 'captcha' };
+
+  // Extract current page results (merged parse-results)
+  const rows = document.querySelectorAll('.result-table-list tbody tr');
+  const checkboxes = document.querySelectorAll('.result-table-list tbody input.cbItem');
+  const results = Array.from(rows).map((row, i) => {
+    const titleLink = row.querySelector('td.name a.fz14');
+    const authors = Array.from(row.querySelectorAll('td.author a.KnowledgeNetLink') || []).map(a => a.innerText?.trim());
+    const journal = row.querySelector('td.source a')?.innerText?.trim() || '';
+    const date = row.querySelector('td.date')?.innerText?.trim() || '';
+    const citations = row.querySelector('td.quote')?.innerText?.trim() || '';
+    const downloads = row.querySelector('td.download')?.innerText?.trim() || '';
+    return {
+      n: i + 1,
+      title: titleLink?.innerText?.trim() || '',
+      href: titleLink?.href || '',
+      exportId: checkboxes[i]?.value || '',
+      authors: authors.join('; '),
+      journal,
+      date,
+      citations,
+      downloads
+    };
+  });
+
+  return {
+    query,
+    total: document.querySelector('.pagerTitleCell')?.innerText?.match(/([\d,]+)/)?.[1] || '0',
+    page: document.querySelector('.countPageMark')?.innerText || '1/1',
+    results
+  };
+}
+```
+
+### 3. Report
+
+Present results as a numbered list:
+
+```
+Searched CNKI for "$ARGUMENTS": found {total} results (page {page}).
+
+1. {title}
+   Authors: {authors} | Journal: {journal} | Date: {date}
+   Citations: {citations} | Downloads: {downloads}
+
+2. ...
+```
+
+### 4. Follow-up: navigate to a paper
+
+When the user wants to open or download a specific paper, use `navigate_page` with the result's `href` URL directly — do NOT click the link (clicking opens a new tab and wastes 3 extra tool calls for tab management).
+
+## Captcha detection
+
+Check `#tcaptcha_transform_dy` element's `getBoundingClientRect().top >= 0`.
+Tencent captcha SDK preloads DOM at `top: -1000000px` (off-screen, not active).
+Only return `error: 'captcha'` when `top >= 0` (actually visible to user).
+
+## Verified selectors
+
+| Element | Selector | Notes |
+|---------|----------|-------|
+| Search input | `input.search-input` | id=`txt_search`, placeholder "中文文献、外文文献" |
+| Search button | `input.search-btn` | type="button" |
+| Result count | `.pagerTitleCell` | text "共找到 X 条结果" |
+| Page indicator | `.countPageMark` | text "1/300" |
+| Result rows | `.result-table-list tbody tr` | Each row = one paper |
+| Title link | `td.name a.fz14` | Paper title with href |
+| Authors | `td.author a.KnowledgeNetLink` | Author name links |
+| Journal | `td.source a` | Journal/source link |
+| Date | `td.date` | Publication date text |
+| Citations | `td.quote` | Citation count |
+| Downloads | `td.download` | Download count |
+
+## Batch export to Zotero
+
+When user wants to save results to Zotero, use batch export directly from the results page — **do NOT navigate to each detail page**. The `exportId` in results equals the detail page's `#export-id`. Call `cnki-export` skill with batch mode (Step 1B). See cnki-export SKILL.md for details.
+
+## Tool calls: 2 (navigate + evaluate_script)
