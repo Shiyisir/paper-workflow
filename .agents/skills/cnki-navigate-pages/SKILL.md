@@ -21,6 +21,9 @@ Before using this skill:
 5. If Chrome DevTools MCP is unavailable, stop and ask the user to follow `docs/setup-cnki-mcp.md`.
 6. Do not fabricate CNKI results, citations, download links, journal metadata, or page content.
 
+
+**Capability note**: Fully automated CNKI page navigation may be blocked by CNKI CAPTCHA. If CNKI redirects to verify/home, stop and ask the user to complete manual action. Preferred compliant workflow is manual navigation by the user in the same Chrome instance/profile as MCP, followed by MCP read-only extraction. See docs/setup-cnki-mcp.md for details.
+
 ## Arguments
 ## Preflight
 
