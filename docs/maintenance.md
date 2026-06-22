@@ -67,7 +67,7 @@
 
 ## 当前结构说明
 
-- paper-workflow 编排器：`.claude/skills/paper-workflow/`（v0.1.2）
+- paper-workflow 编排器：`.claude/skills/paper-workflow/`（v0.2.0）
 - 叶子 skill 符号链接：`.agents/skills/` → `~/.aweskill/skills/`
 - MCP 配置（Chrome DevTools）：`.claude/settings.json` 和 `.codex/config.toml`
 - Codex agent 配置：`.codex/agents/`

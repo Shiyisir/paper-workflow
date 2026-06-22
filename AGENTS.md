@@ -1,9 +1,10 @@
 ﻿# AGENTS.md
 
 ## 这份文件的定位
-这是本项目唯一权威的 AI 执行规则文件。
+这是本项目的 AI 执行规则文件。Claude Code 通过 `CLAUDE.md` 的 `@AGENTS.md` 委托加载。
 
-- AI 入口规则：AGENTS.md
+- Claude Code 入口：CLAUDE.md（`@AGENTS.md` + `@CONTEXT.md`）
+- AI 执行规则：AGENTS.md
 - 人类入口说明：README.md
 - 运行时状态：CONTEXT.md
 - 详细说明：docs/
@@ -31,7 +32,7 @@ AI 在这里的价值：
 
 ## paper-workflow 编排层
 
-`paper-workflow` v0.1.2（v0.2 开发中）是论文工作的唯一编排入口。核心能力：
+`paper-workflow` v0.2.0 是论文工作的唯一编排入口。核心能力：
 - 17 阶段状态机 + 依赖检查 + 断点恢复
 - 文献库 CRUD + 5 级去重
 - 证据矩阵 + 论点引文映射
@@ -40,11 +41,12 @@ AI 在这里的价值：
 
 详见 `.claude/skills/paper-workflow/README.md`。
 
-## 三个权威文件
+## 四个权威文件
 
 | 文件 | 读者 | 用途 |
 |---|---|---|
 | README.md | 人 | 项目是什么、怎么开始 |
+| CLAUDE.md | Claude Code | CC 入口，委托到 AGENTS.md + CONTEXT.md |
 | AGENTS.md | AI | 执行规则、禁止事项、输出规范 |
 | CONTEXT.md | 人和 AI | 论文索引、当前活跃论文、进度 |
 
@@ -91,7 +93,7 @@ euro-asyn-llps
 执行原则：
 - 用户需求明确命中技能时，直接执行
 - 不确定时，先展示阶段菜单，再继续
-- 知网相关操作前，先检查 Chrome 是否可用
+- 知网相关操作前，先确认 Chrome DevTools MCP 可用；CNKI 可能触发验证码，详见 `docs/setup-cnki-mcp.md`
 - 国际文献与中文文献分开判断来源
 
 ## 输出位置

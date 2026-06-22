@@ -17,7 +17,7 @@
 
 ## paper-workflow 编排器
 
-`paper-workflow` v0.1.2 已交付，位于 `.claude/skills/paper-workflow/`。
+`paper-workflow` v0.2.0 已交付，位于 `.claude/skills/paper-workflow/`。
 通过 `/paper-workflow init|status|resume|run|qa|render` 命令管理论文项目。
 单次任务（搜文献、润色等）仍由叶子 skill 直接响应，不走 paper-workflow。
 
